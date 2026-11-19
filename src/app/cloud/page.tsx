@@ -1,16 +1,20 @@
-import { LogOut } from "lucide-react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 
-import { FamilyApp } from "@/components/family-app";
+import { CloudDashboard } from "@/components/cloud/cloud-dashboard";
 import { WorkspaceSetup } from "@/components/cloud/workspace-setup";
+import type {
+  CloudProgram,
+  CloudProfile,
+  CloudSession,
+} from "@/components/cloud/types";
 import { createClient } from "@/lib/supabase/server";
-
-import { signOut } from "./actions";
 
 // This authenticated route reads request cookies and Supabase on every visit.
 export const instant = false;
 
 export default async function CloudAppPage() {
+  await connection();
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
   if (error || !data?.claims) redirect("/login");
@@ -18,7 +22,7 @@ export default async function CloudAppPage() {
   const userId = data.claims.sub;
   const { data: membership, error: membershipError } = await supabase
     .from("household_members")
-    .select("household_id")
+    .select("household_id, role")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -32,17 +36,96 @@ export default async function CloudAppPage() {
     return <WorkspaceSetup defaultOwnerName={defaultOwnerName} />;
   }
 
+  const [householdResult, profilesResult] = await Promise.all([
+    supabase
+      .from("households")
+      .select("id, name")
+      .eq("id", membership.household_id)
+      .single(),
+    supabase
+      .from("profiles")
+      .select("id, name, initials, focus, theme")
+      .eq("household_id", membership.household_id)
+      .order("created_at", { ascending: true }),
+  ]);
+
+  if (householdResult.error || profilesResult.error || !householdResult.data) {
+    throw new Error("Nie udało się wczytać danych rodzinnych.");
+  }
+
+  const profiles: CloudProfile[] = (profilesResult.data ?? []).map((profile) => {
+    const theme = profile.theme && typeof profile.theme === "object"
+      ? (profile.theme as Record<string, unknown>)
+      : {};
+    return {
+      id: profile.id,
+      name: profile.name,
+      initials: profile.initials,
+      focus: profile.focus,
+      accent: typeof theme.accent === "string" ? theme.accent : "#ff7a2f",
+    };
+  });
+  const profileIds = profiles.map((profile) => profile.id);
+
+  const [programsResult, sessionsResult] = profileIds.length > 0
+    ? await Promise.all([
+        supabase
+          .from("training_programs")
+          .select("id, profile_id, title, goal, weeks, sessions_per_week, current_week, progress_percent, status, started_at, ended_at, end_reason")
+          .in("profile_id", profileIds)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("training_sessions")
+          .select("id, profile_id, program_id, scheduled_for, title, subtitle, kind, environment, intensity, duration_minutes, status")
+          .in("profile_id", profileIds)
+          .order("scheduled_for", { ascending: true })
+          .limit(200),
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }];
+
+  if (programsResult.error || sessionsResult.error) {
+    throw new Error("Nie udało się wczytać programów i treningów.");
+  }
+
+  const programs: CloudProgram[] = (programsResult.data ?? []).map((program) => ({
+    id: program.id,
+    profileId: program.profile_id,
+    title: program.title,
+    goal: program.goal,
+    weeks: program.weeks,
+    sessionsPerWeek: program.sessions_per_week,
+    currentWeek: program.current_week,
+    progressPercent: program.progress_percent,
+    status: program.status,
+    startedAt: program.started_at,
+    endedAt: program.ended_at,
+    endReason: program.end_reason,
+  }));
+
+  const sessions: CloudSession[] = (sessionsResult.data ?? []).map((session) => ({
+    id: session.id,
+    profileId: session.profile_id,
+    programId: session.program_id,
+    scheduledFor: session.scheduled_for,
+    title: session.title,
+    subtitle: session.subtitle,
+    kind: session.kind,
+    environment: session.environment,
+    intensity: session.intensity,
+    durationMinutes: session.duration_minutes,
+    status: session.status,
+  }));
+
   return (
-    <>
-      <div className="fixed right-3 top-3 z-50">
-        <form action={signOut}>
-          <button type="submit" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#102019]/95 px-3 py-2 text-xs font-bold text-white/60 shadow-lg backdrop-blur transition hover:text-white">
-            <LogOut aria-hidden="true" className="size-4" />
-            Wyloguj
-          </button>
-        </form>
-      </div>
-      <FamilyApp />
-    </>
+    <CloudDashboard
+      householdId={membership.household_id}
+      today={new Date().toISOString().slice(0, 10)}
+      data={{
+        householdName: householdResult.data.name,
+        profiles,
+        programs,
+        sessions,
+      }}
+    />
   );
 }

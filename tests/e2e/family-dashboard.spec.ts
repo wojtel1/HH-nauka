@@ -30,7 +30,7 @@ test.beforeEach(async ({ page }) => {
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
-  await page.goto("/");
+  await page.goto("/demo");
 });
 
 test("pokazuje wyłącznie trzy rodzinne profile", async ({ page }) => {

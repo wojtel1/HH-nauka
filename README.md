@@ -8,10 +8,13 @@ trzech prywatnych profili: Wojtek, Kasia i Maja.
 
 - wybór profilu i pierwsze ustawienie 6-cyfrowej lokalnej blokady PIN;
 - automatyczne blokowanie profilu oraz przełączanie bez mieszania stanu;
-- osobne motywy, cele i integracje demonstracyjne dla każdego profilu;
+- osobne motywy, cele i integracje demonstracyjne w trybie `/demo`;
 - tygodniowy planer Rouvy + siłownia z regułą regeneracji nóg;
 - interaktywny dashboard, dieta, makro, wykresy i galeria postępu;
 - responsywny układ desktop/mobile oraz manifest i ikony PWA;
+- chmurowe profile, programy i treningi zapisywane w Supabase;
+- rower indoor/outdoor, spacery, hiking, siła, mobilność i regeneracja;
+- kończenie programu, rozpoczynanie nowego oraz oznaczanie wykonanych sesji;
 - przygotowane kanały danych: FIT, Garmin, Health Connect i HealthKit;
 - testy jednostkowe oraz E2E na desktopowym i mobilnym Chromium.
 
@@ -40,8 +43,7 @@ Warstwa chmurowa używa Supabase Auth, PostgreSQL oraz Row Level Security. Aby j
 podłączyć:
 
 1. utwórz bezpłatny projekt Supabase;
-2. wykonaj migrację z
-   `supabase/migrations/202611190001_initial_family_training.sql`;
+2. wykonaj po kolei migracje z katalogu `supabase/migrations/`;
 3. skopiuj `.env.example` do `.env.local` i uzupełnij URL projektu oraz
    publishable key;
 4. uruchom ponownie `pnpm dev`.
@@ -51,6 +53,7 @@ Po konfiguracji:
 - `/login` — logowanie jednorazowym linkiem e-mail;
 - `/auth/confirm` — bezpieczna wymiana kodu na sesję w ciasteczku;
 - `/cloud` — chroniona wersja aplikacji, dostępna tylko po zalogowaniu;
+- `/demo` — odseparowana prezentacja interfejsu na przykładowych danych;
 - pierwsze wejście do `/cloud` tworzy prawdziwą przestrzeń rodzinną i profil
   właściciela w bazie danych.
 
@@ -75,16 +78,17 @@ Polecenie `pnpm check` wykonuje lint, typecheck, testy jednostkowe i build.
 
 ## Granice obecnej wersji
 
-To rozwijany front-end MVP na danych demonstracyjnych z przygotowanym schematem
-chmurowym. Lokalny PIN używa
+To rozwijany produkt z działającym kontem chmurowym, profilami, programami i
+treningami. Oddzielny tryb demonstracyjny nadal korzysta z przykładowych danych.
+Lokalny PIN używa
 PBKDF2 i losowej soli, ale jest wyłącznie blokadą prototypu na zaufanym
 urządzeniu. Nie zastępuje Supabase Auth, passkey ani biometrii. Dane zdrowotne,
 zdjęcia i tokeny integracji nie są jeszcze wysyłane ani przechowywane.
 
 Produkcyjny etap wymaga:
 
-1. podłączenia projektu Supabase, ekranów logowania i zapisu danych;
-2. serwerowej weryfikacji zaufanego urządzenia oraz bezpiecznych sesji;
+1. edycji istniejących treningów oraz szerszej historii i raportów;
+2. serwerowej weryfikacji zaufanego urządzenia, passkeys lub biometrii;
 3. zatwierdzonego dostępu Garmin API;
 4. natywnej obudowy Capacitor dla Health Connect i HealthKit;
 5. testów na rzeczywistych urządzeniach Kasi, Wojtka i Mai.
@@ -97,6 +101,7 @@ oficjalnego dostępu podstawą pozostaje własny plan i import FIT.
 - `src/lib/` — model domeny, dane demonstracyjne i algorytm planowania;
 - `src/components/profile/` — wybór profilu i lokalna blokada PIN;
 - `src/components/dashboard/` — responsywny dashboard;
+- `src/components/cloud/` — produkcyjny dashboard oparty na danych Supabase;
 - `src/components/pwa/` — pomocnik instalacji;
 - `tests/e2e/` — scenariusze desktop/mobile;
 - `public/icons/` — ikony wygenerowane z zaakceptowanej grafiki.
