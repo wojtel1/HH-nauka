@@ -1,4 +1,4 @@
-# TrailVelo Family
+# Endurance
 
 Robocza wersja rodzinnej aplikacji PWA do planowania treningów rowerowych,
 siłowych, regeneracji i podstawowego żywienia. Interfejs jest przygotowany dla
@@ -101,4 +101,4 @@ oficjalnego dostępu podstawą pozostaje własny plan i import FIT.
 - `tests/e2e/` — scenariusze desktop/mobile;
 - `public/icons/` — ikony wygenerowane z zaakceptowanej grafiki.
 
-Nazwa „TrailVelo Family” jest nazwą roboczą do czasu decyzji brandingowej.
+Nazwa produktu: „Endurance”.

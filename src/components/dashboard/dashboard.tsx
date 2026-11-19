@@ -378,7 +378,7 @@ function BrandMark({ compact = false }: { compact?: boolean }) {
           <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-orange-300">
             Family training
           </p>
-          <p className="text-lg font-black tracking-tight text-white">TrailVelo</p>
+          <p className="text-lg font-black tracking-tight text-white">Endurance</p>
         </div>
       )}
     </div>

@@ -3,8 +3,8 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "TrailVelo Family",
-    short_name: "TrailVelo",
+    name: "Endurance",
+    short_name: "Endurance",
     description:
       "Rodzinny planer treningów rowerowych, siłowych i codziennych nawyków.",
     start_url: "/",

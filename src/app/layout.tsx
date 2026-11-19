@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  applicationName: "TrailVelo Family",
+  applicationName: "Endurance",
   title: {
-    default: "TrailVelo Family",
-    template: "%s · TrailVelo Family",
+    default: "Endurance",
+    template: "%s · Endurance",
   },
   description:
     "Rodzinny planer treningów rowerowych, siłowych, regeneracji i żywienia.",
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "TrailVelo",
+    title: "Endurance",
   },
   formatDetection: {
     telephone: false,

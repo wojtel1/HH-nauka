@@ -1,4 +1,4 @@
--- TrailVelo Family: initial cloud schema.
+-- Endurance: initial cloud schema.
 -- Apply with the Supabase CLI or paste into the Supabase SQL editor.
 
 create extension if not exists pgcrypto;

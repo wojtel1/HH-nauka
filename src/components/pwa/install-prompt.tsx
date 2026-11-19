@@ -80,7 +80,7 @@ export function InstallPrompt() {
           )}
         </span>
         <div>
-          <p className="font-semibold">Zainstaluj TrailVelo</p>
+          <p className="font-semibold">Zainstaluj Endurance</p>
           <p className="mt-1 text-sm leading-5 text-white/65">
             {isIOS
               ? "W Safari wybierz Udostępnij, a następnie Dodaj do ekranu początkowego."

@@ -24,7 +24,7 @@ export default async function LoginPage() {
           <Bike aria-hidden="true" className="size-7" />
         </span>
         <p className="mt-7 text-[11px] font-black uppercase tracking-[0.2em] text-orange-300/80">
-          TrailVelo Family
+          Endurance
         </p>
         <h1 className="mt-2 text-3xl font-black tracking-tight">Zaloguj się do rodziny</h1>
         <p className="mt-3 text-sm leading-6 text-white/50">
