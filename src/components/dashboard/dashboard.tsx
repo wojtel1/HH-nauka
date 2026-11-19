@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   Activity,
   Apple,
@@ -43,6 +43,17 @@ import {
   YAxis,
 } from "recharts";
 import clsx from "clsx";
+import {
+  createProgramLifecycle,
+  endProgram,
+  parseProgramLifecycles,
+  startProgram,
+  type ActiveProgram,
+  type ProgramHistoryEntry,
+  type ProgramLifecycle,
+  type ProgramLifecycleByProfile,
+  type ProgramTemplate,
+} from "@/lib/program-lifecycle";
 import type {
   DashboardData,
   DashboardMetric,
@@ -79,6 +90,11 @@ const kindConfig: Record<
     label: "Rower",
     className: "bg-lime-400/15 text-lime-300 ring-lime-300/20",
   },
+  "outdoor-cycling": {
+    icon: Bike,
+    label: "Rower outdoor",
+    className: "bg-amber-400/15 text-amber-300 ring-amber-300/20",
+  },
   strength: {
     icon: Dumbbell,
     label: "Siła",
@@ -94,6 +110,16 @@ const kindConfig: Record<
     label: "Mobilność",
     className: "bg-violet-400/15 text-violet-300 ring-violet-300/20",
   },
+  walking: {
+    icon: Footprints,
+    label: "Spacer",
+    className: "bg-teal-400/15 text-teal-300 ring-teal-300/20",
+  },
+  hiking: {
+    icon: Mountain,
+    label: "Hike",
+    className: "bg-yellow-400/15 text-yellow-300 ring-yellow-300/20",
+  },
 };
 
 const integrationIcons: Record<IntegrationKind, LucideIcon> = {
@@ -103,17 +129,43 @@ const integrationIcons: Record<IntegrationKind, LucideIcon> = {
   manual: Activity,
 };
 
+const PROGRAM_STORAGE_KEY = "trailvelo-program-lifecycle-v1";
+
+const programCatalog: ProgramTemplate[] = [
+  {
+    id: "balanced-base-6",
+    title: "Baza outdoor i regularność · 6 tygodni",
+    goal: "Rower na zewnątrz, spacery i hike uzupełniają spokojne budowanie wytrzymałości",
+    weeks: 6,
+  },
+  {
+    id: "strength-mobility-8",
+    title: "Siła i mobilność · 8 tygodni",
+    goal: "Więcej siły całego ciała bez pomijania regeneracji",
+    weeks: 8,
+  },
+  {
+    id: "cycling-power-4",
+    title: "Moc na rowerze · 4 tygodnie",
+    goal: "Kontrolowany rozwój mocy progowej przed kolejnym blokiem",
+    weeks: 4,
+  },
+];
+
 function createFallbackData(profile: DashboardProfile): DashboardData {
   const isMaja = profile.name.toLocaleLowerCase("pl").includes("maja");
   const isKasia = profile.name.toLocaleLowerCase("pl").includes("kasia");
 
   return {
     weekLabel: "18–24 listopada",
+    programId: isMaja ? "full-body-strength" : "ftp-builder",
     programName: isMaja ? "Siła • pełne ciało" : "FTP Builder • tydzień 2/4",
     programSubtitle: isMaja
       ? "Trzy sesje z progresją ciężaru"
       : "Równowaga między mocą, siłą i regeneracją",
     programProgress: isMaja ? 42 : 58,
+    programWeeks: isMaja ? 8 : 4,
+    programCurrentWeek: isMaja ? 3 : 2,
     metrics: [
       {
         id: "sessions",
@@ -710,7 +762,15 @@ function WeeklyPlan({
   );
 }
 
-function ProgramCard({ data }: { data: DashboardData }) {
+function ProgramCard({
+  active,
+  historyCount,
+  onManage,
+}: {
+  active: ActiveProgram | null;
+  historyCount: number;
+  onManage: () => void;
+}) {
   return (
     <section className="overflow-hidden rounded-[1.8rem] border border-white/8 bg-[#101f19]/78">
       <div className="relative overflow-hidden p-5">
@@ -720,29 +780,134 @@ function ProgramCard({ data }: { data: DashboardData }) {
             <Bike aria-hidden="true" className="size-5" />
           </span>
           <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/45">
-            Aktywny program
+            {active ? "Aktywny program" : "Gotowy na zmianę"}
           </span>
         </div>
-        <h2 className="relative mt-5 text-lg font-black text-white">{data.programName}</h2>
-        <p className="relative mt-1 text-xs leading-5 text-white/42">{data.programSubtitle}</p>
-        <div className="relative mt-5">
-          <div className="mb-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
-            <span className="text-white/35">Realizacja</span>
-            <span className="text-orange-300">{data.programProgress}%</span>
+        <h2 className="relative mt-5 text-lg font-black text-white">
+          {active?.title ?? "Brak aktywnego programu"}
+        </h2>
+        <p className="relative mt-1 text-xs leading-5 text-white/42">
+          {active?.goal ?? "Wybierz kolejny program, gdy będziesz gotowy."}
+        </p>
+        {active ? (
+          <div className="relative mt-5">
+            <div className="mb-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
+              <span className="text-white/35">Tydzień {active.currentWeek}/{active.weeks}</span>
+              <span className="text-orange-300">{active.progressPercent}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-white/6">
+              <div
+                className="h-full rounded-full bg-[linear-gradient(90deg,#f68b36,#f9b467)] shadow-[0_0_20px_rgba(246,139,54,.35)]"
+                style={{ width: `${active.progressPercent}%` }}
+              />
+            </div>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-white/6">
-            <div
-              className="h-full rounded-full bg-[linear-gradient(90deg,#f68b36,#f9b467)] shadow-[0_0_20px_rgba(246,139,54,.35)]"
-              style={{ width: `${data.programProgress}%` }}
-            />
-          </div>
-        </div>
+        ) : null}
+        {historyCount > 0 ? (
+          <p className="relative mt-4 text-[10px] font-bold uppercase tracking-wider text-white/30">
+            Historia: {historyCount} {historyCount === 1 ? "program" : "programy"}
+          </p>
+        ) : null}
       </div>
-      <button type="button" className="flex w-full items-center justify-between border-t border-white/7 px-5 py-3.5 text-xs font-bold text-white/50 transition hover:bg-white/[.025] hover:text-white">
-        Szczegóły programu
+      <button type="button" onClick={onManage} className="flex w-full items-center justify-between border-t border-white/7 px-5 py-3.5 text-xs font-bold text-white/50 transition hover:bg-white/[.025] hover:text-white">
+        {active ? "Szczegóły i zmiana programu" : "Wybierz nowy program"}
         <ChevronRight aria-hidden="true" className="size-4" />
       </button>
     </section>
+  );
+}
+
+function ProgramManagerDialog({
+  active,
+  history,
+  onClose,
+  onEnd,
+  onStart,
+  open,
+}: {
+  active: ActiveProgram | null;
+  history: ProgramHistoryEntry[];
+  onClose: () => void;
+  onEnd: (reason: string) => void;
+  onStart: (template: ProgramTemplate) => void;
+  open: boolean;
+}) {
+  const [reason, setReason] = useState("");
+  const [selectedId, setSelectedId] = useState(programCatalog[0].id);
+  if (!open) return null;
+
+  const selectedProgram =
+    programCatalog.find((program) => program.id === selectedId) ?? programCatalog[0];
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-end bg-black/70 backdrop-blur-sm sm:place-items-center sm:p-5" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section role="dialog" aria-modal="true" aria-labelledby="program-manager-title" className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-[2rem] border border-white/10 bg-[#102019] p-5 shadow-2xl sm:rounded-[2rem] sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-300/75">Program treningowy</p>
+            <h2 id="program-manager-title" className="mt-1 text-2xl font-black text-white">
+              {active ? "Twój aktywny program" : "Wybierz kolejny program"}
+            </h2>
+          </div>
+          <button type="button" onClick={onClose} className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/5 text-white/45 transition hover:bg-white/10 hover:text-white" aria-label="Zamknij">
+            <X aria-hidden="true" className="size-5" />
+          </button>
+        </div>
+
+        {active ? (
+          <div className="mt-6">
+            <div className="rounded-3xl border border-orange-300/15 bg-orange-400/[.07] p-5">
+              <h3 className="text-lg font-black text-white">{active.title}</h3>
+              <p className="mt-1 text-sm leading-6 text-white/50">{active.goal}</p>
+              <div className="mt-4 flex items-center justify-between text-xs font-bold text-white/45">
+                <span>Tydzień {active.currentWeek} z {active.weeks}</span>
+                <span className="text-orange-300">{active.progressPercent}%</span>
+              </div>
+            </div>
+            <div className="mt-5 rounded-3xl border border-white/8 bg-white/[.025] p-5">
+              <h3 className="font-black text-white">Chcesz zmienić plan?</h3>
+              <p className="mt-1 text-xs leading-5 text-white/45">Dotychczasowy postęp zostanie zachowany w historii. Potem od razu możesz wybrać nowy program.</p>
+              <label className="mt-4 block text-xs font-bold text-white/60" htmlFor="program-end-reason">Powód zakończenia (opcjonalnie)</label>
+              <textarea id="program-end-reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={240} placeholder="Np. zmiana celu, zbyt duże obciążenie…" className="mt-2 min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-white outline-none placeholder:text-white/25 focus:border-orange-300/50" />
+              <button type="button" onClick={() => { onEnd(reason); setReason(""); }} className="sticky bottom-2 z-20 mt-3 w-full rounded-2xl border border-red-300/20 bg-[#3b2d29] px-4 py-3 text-sm font-black text-red-100 shadow-xl transition hover:bg-red-400/15 sm:static">
+                Zakończ ten program
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-6">
+            <div className="grid gap-2">
+              {programCatalog.map((program) => {
+                const selected = program.id === selectedId;
+                return (
+                  <button key={program.id} type="button" aria-pressed={selected} onClick={() => setSelectedId(program.id)} className={clsx("rounded-2xl border p-4 text-left transition", selected ? "border-orange-300/40 bg-orange-400/10" : "border-white/8 bg-white/[.025] hover:bg-white/[.05]")}>
+                    <span className="block font-black text-white">{program.title}</span>
+                    <span className="mt-1 block text-xs leading-5 text-white/45">{program.goal}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <button type="button" onClick={() => onStart(selectedProgram)} className="mt-4 w-full rounded-2xl bg-orange-400 px-4 py-3.5 text-sm font-black text-[#102019] transition hover:bg-orange-300">
+              Rozpocznij wybrany program
+            </button>
+          </div>
+        )}
+
+        {history.length > 0 ? (
+          <div className="mt-6 border-t border-white/8 pt-5">
+            <h3 className="text-xs font-black uppercase tracking-wider text-white/40">Ostatnio zakończone</h3>
+            <div className="mt-3 space-y-2">
+              {history.slice(0, 3).map((entry) => (
+                <div key={`${entry.id}-${entry.endedAt}`} className="rounded-2xl bg-white/[.025] px-4 py-3">
+                  <p className="text-sm font-bold text-white/70">{entry.title}</p>
+                  <p className="mt-1 text-[11px] text-white/35">{entry.progressPercent}% realizacji · {entry.endReason}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </section>
+    </div>
   );
 }
 
@@ -906,6 +1071,9 @@ function QuickAddDialog({ open, onClose }: { open: boolean; onClose: () => void 
   if (!open) return null;
   const choices = [
     { label: "Jazda Rouvy", helper: "Trening lub import FIT", icon: Bike, color: "text-orange-300 bg-orange-400/12" },
+    { label: "Jazda outdoor", helper: "Rower na zewnątrz", icon: Route, color: "text-amber-300 bg-amber-400/12" },
+    { label: "Spacer", helper: "Lekka aktywność i regeneracja", icon: Footprints, color: "text-teal-300 bg-teal-400/12" },
+    { label: "Hike", helper: "Wędrówka terenowa i przewyższenie", icon: Mountain, color: "text-yellow-300 bg-yellow-400/12" },
     { label: "Trening siłowy", helper: "Serie, powtórzenia, ciężar", icon: Dumbbell, color: "text-sky-300 bg-sky-400/12" },
     { label: "Posiłek", helper: "Kalorie i makroskładniki", icon: Utensils, color: "text-emerald-300 bg-emerald-400/12" },
     { label: "Zdjęcie postępu", helper: "Prywatny załącznik", icon: Camera, color: "text-violet-300 bg-violet-400/12" },
@@ -996,8 +1164,57 @@ export function Dashboard({ profile, data: providedData, onSwitchProfile, onLock
   const [activeSection, setActiveSection] = useState<DashboardSection>("overview");
   const [sessionState, setSessionState] = useState<Record<string, DashboardSession[]>>({});
   const sessions = sessionState[profile.id] ?? data.sessions;
+  const [programLifecycles, setProgramLifecycles] = useState<ProgramLifecycleByProfile>({});
+  const [programStorageReady, setProgramStorageReady] = useState(false);
+  const [programManagerOpen, setProgramManagerOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const defaultProgram: ActiveProgram = useMemo(
+    () => ({
+      id: data.programId,
+      title: data.programName,
+      goal: data.programSubtitle,
+      weeks: data.programWeeks,
+      currentWeek: data.programCurrentWeek,
+      progressPercent: data.programProgress,
+      startedAt: new Date().toISOString(),
+    }),
+    [
+      data.programCurrentWeek,
+      data.programId,
+      data.programName,
+      data.programProgress,
+      data.programSubtitle,
+      data.programWeeks,
+    ],
+  );
+
+  const programLifecycle =
+    programLifecycles[profile.id] ?? createProgramLifecycle(defaultProgram);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(PROGRAM_STORAGE_KEY);
+    let cancelled = false;
+
+    queueMicrotask(() => {
+      if (cancelled) return;
+      if (saved) setProgramLifecycles(parseProgramLifecycles(saved));
+      setProgramStorageReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!programStorageReady) return;
+    window.localStorage.setItem(
+      PROGRAM_STORAGE_KEY,
+      JSON.stringify(programLifecycles),
+    );
+  }, [programLifecycles, programStorageReady]);
 
   const dashboardStyle = {
     "--profile-accent": profile.accent,
@@ -1013,6 +1230,25 @@ export function Dashboard({ profile, data: providedData, onSwitchProfile, onLock
           : session,
       ),
     }));
+  };
+
+  const updateProgram = (
+    update: (current: ProgramLifecycle) => ProgramLifecycle,
+  ) => {
+    setProgramLifecycles((current) => ({
+      ...current,
+      [profile.id]: update(
+        current[profile.id] ?? createProgramLifecycle(defaultProgram),
+      ),
+    }));
+  };
+
+  const finishProgram = (reason: string) => {
+    updateProgram((current) => endProgram(current, reason));
+  };
+
+  const beginProgram = (template: ProgramTemplate) => {
+    updateProgram((current) => startProgram(current, template));
   };
 
   const navigateTo = (section: DashboardSection) => {
@@ -1039,14 +1275,18 @@ export function Dashboard({ profile, data: providedData, onSwitchProfile, onLock
         <div className="min-w-0 flex-1 pb-24 lg:pb-0">
           <Topbar profile={profile} onMenu={() => setMobileMenuOpen(true)} onSwitchProfile={onSwitchProfile} />
           <main className="space-y-4 px-4 pb-8 sm:space-y-5 sm:px-6 lg:px-8">
-            <p role="status" className="rounded-2xl border border-orange-300/25 bg-orange-400/10 px-4 py-3 text-sm text-orange-100">Wersja demonstracyjna: dane są przykładowe, zmiany nie są zapisywane, a PIN nie zapewnia prywatności konta. Nie wpisuj prawdziwych danych.</p>
+            <p role="status" className="rounded-2xl border border-orange-300/25 bg-orange-400/10 px-4 py-3 text-sm text-orange-100">Wersja przedprodukcyjna: zmiany programu są zapisywane lokalnie. Dane przykładowe i PIN nie zapewniają jeszcze ochrony konta — nie wpisuj prawdziwych danych zdrowotnych.</p>
             <Hero profile={profile} data={data} onQuickAdd={() => setQuickAddOpen(true)} />
             <Metrics metrics={data.metrics} />
 
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.75fr)]">
               <WeeklyPlan sessions={sessions} onToggle={toggleSession} />
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-                <ProgramCard data={data} />
+                <ProgramCard
+                  active={programLifecycle.active}
+                  historyCount={programLifecycle.history.length}
+                  onManage={() => setProgramManagerOpen(true)}
+                />
                 <NutritionCard data={data} />
               </div>
             </div>
@@ -1062,6 +1302,14 @@ export function Dashboard({ profile, data: providedData, onSwitchProfile, onLock
 
       <MobileNav active={activeSection} onChange={navigateTo} />
       <MobileMenu open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} profile={profile} onSwitchProfile={onSwitchProfile} onLock={onLock} />
+      <ProgramManagerDialog
+        active={programLifecycle.active}
+        history={programLifecycle.history}
+        onClose={() => setProgramManagerOpen(false)}
+        onEnd={finishProgram}
+        onStart={beginProgram}
+        open={programManagerOpen}
+      />
       <QuickAddDialog open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
     </div>
   );

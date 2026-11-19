@@ -69,6 +69,46 @@ test("dashboard mieści się w dostępnym widoku", async ({ page }) => {
   expect(overflowsHorizontally).toBe(false);
 });
 
+test("plan uwzględnia rower outdoor, spacer i hike", async ({ page }) => {
+  await setUpPinAndOpenDashboard(page, "Kasia");
+
+  await expect(page.getByText("Jazda outdoor · wytrzymałość")).toBeVisible();
+  await expect(page.getByText("Spacer regeneracyjny")).toBeVisible();
+  await expect(page.getByText("Hike · wędrówka terenowa")).toBeVisible();
+});
+
+test("pozwala zakończyć program i rozpocząć nowy", async ({ page }) => {
+  await setUpPinAndOpenDashboard(page, "Wojtek");
+
+  await page
+    .getByRole("button", { name: "Szczegóły i zmiana programu" })
+    .click();
+
+  const dialog = page.getByRole("dialog", { name: "Twój aktywny program" });
+  await expect(dialog).toBeVisible();
+  await dialog
+    .getByLabel("Powód zakończenia (opcjonalnie)")
+    .fill("Zmiana celu treningowego");
+  // Keyboard activation avoids a Chrome mobile-emulation coordinate bug that
+  // can report the focused textarea as covering the adjacent visible button.
+  await dialog
+    .getByRole("button", { name: "Zakończ ten program" })
+    .press("Enter");
+
+  await expect(
+    page.getByRole("heading", { name: "Wybierz kolejny program" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: /Baza outdoor i regularność/ })
+    .click();
+  await page
+    .getByRole("button", { name: "Rozpocznij wybrany program" })
+    .click();
+
+  await expect(page.getByText("Baza outdoor i regularność · 6 tygodni").first()).toBeVisible();
+  await expect(page.getByText("Zmiana celu treningowego")).toBeVisible();
+});
+
 test("udostępnia instalowalny manifest PWA", async ({ request }) => {
   const response = await request.get("/manifest.webmanifest");
 

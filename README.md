@@ -30,6 +30,37 @@ Aplikacja nasłuchuje na `0.0.0.0:3100`. Kontrola gotowości:
 curl --fail http://127.0.0.1:3100/
 ```
 
+Bez konfiguracji chmurowej aplikacja uruchamia się w trybie przedprodukcyjnym.
+Zmiana aktywnego programu i historia zakończonych programów są wtedy zapisywane
+lokalnie w przeglądarce.
+
+## Konfiguracja Supabase
+
+Warstwa chmurowa używa Supabase Auth, PostgreSQL oraz Row Level Security. Aby ją
+podłączyć:
+
+1. utwórz bezpłatny projekt Supabase;
+2. wykonaj migrację z
+   `supabase/migrations/202611190001_initial_family_training.sql`;
+3. skopiuj `.env.example` do `.env.local` i uzupełnij URL projektu oraz
+   publishable key;
+4. uruchom ponownie `pnpm dev`.
+
+Po konfiguracji:
+
+- `/login` — logowanie jednorazowym linkiem e-mail;
+- `/auth/confirm` — bezpieczna wymiana kodu na sesję w ciasteczku;
+- `/cloud` — chroniona wersja aplikacji, dostępna tylko po zalogowaniu;
+- pierwsze wejście do `/cloud` tworzy prawdziwą przestrzeń rodzinną i profil
+  właściciela w bazie danych.
+
+W ustawieniach Supabase Auth dodaj `http://localhost:3100/auth/confirm` do
+dozwolonych Redirect URLs. Po wdrożeniu dodaj również odpowiedni adres HTTPS.
+
+Klucz `service_role` nie jest potrzebny w aplikacji i nie może trafiać do
+przeglądarki. Migracja odbiera anonimowy dostęp do tabel oraz ogranicza dane do
+uwierzytelnionych członków gospodarstwa.
+
 ## Weryfikacja
 
 ```bash
@@ -44,14 +75,15 @@ Polecenie `pnpm check` wykonuje lint, typecheck, testy jednostkowe i build.
 
 ## Granice obecnej wersji
 
-To zweryfikowany front-end MVP na danych demonstracyjnych. Lokalny PIN używa
+To rozwijany front-end MVP na danych demonstracyjnych z przygotowanym schematem
+chmurowym. Lokalny PIN używa
 PBKDF2 i losowej soli, ale jest wyłącznie blokadą prototypu na zaufanym
 urządzeniu. Nie zastępuje Supabase Auth, passkey ani biometrii. Dane zdrowotne,
 zdjęcia i tokeny integracji nie są jeszcze wysyłane ani przechowywane.
 
 Produkcyjny etap wymaga:
 
-1. Supabase Auth/PostgreSQL/Storage i reguł Row Level Security;
+1. podłączenia projektu Supabase, ekranów logowania i zapisu danych;
 2. serwerowej weryfikacji zaufanego urządzenia oraz bezpiecznych sesji;
 3. zatwierdzonego dostępu Garmin API;
 4. natywnej obudowy Capacitor dla Health Connect i HealthKit;

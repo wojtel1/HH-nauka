@@ -65,6 +65,7 @@ const dashboardProfiles: Record<FamilyProfile["id"], DashboardProfile> =
 
 function dashboardKind(session: TrainingSession): DashboardSession["kind"] {
   if (session.kind === "cycling") {
+    if (session.environment === "outdoor") return "outdoor-cycling";
     return session.source === "rouvy" ? "rouvy" : "cycling";
   }
 
@@ -72,7 +73,8 @@ function dashboardKind(session: TrainingSession): DashboardSession["kind"] {
     strength: "strength",
     mobility: "mobility",
     recovery: "recovery",
-    hiking: "recovery",
+    walking: "walking",
+    hiking: "hiking",
   };
 
   return kinds[session.kind] ?? "recovery";
@@ -132,9 +134,12 @@ function makeDashboardData(profile: FamilyProfile): DashboardData {
 
   return {
     weekLabel: "16–22 listopada",
+    programId: plan?.id ?? `family-plan-${profile.id}`,
     programName: plan?.title ?? "Plan rodzinny",
     programSubtitle: plan?.goal ?? "Regularność i świadomy progres",
     programProgress: plan?.progressPercent ?? summary.completionPercent,
+    programWeeks: plan?.weeks ?? 4,
+    programCurrentWeek: plan?.currentWeek ?? 1,
     metrics: [
       {
         id: "sessions",

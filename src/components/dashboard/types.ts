@@ -3,9 +3,12 @@ export type DashboardSection = "overview" | "plan" | "nutrition" | "progress";
 export type SessionKind =
   | "rouvy"
   | "cycling"
+  | "outdoor-cycling"
   | "strength"
   | "recovery"
-  | "mobility";
+  | "mobility"
+  | "walking"
+  | "hiking";
 
 export type IntegrationKind =
   | "garmin"
@@ -70,9 +73,12 @@ export interface ProgressPoint {
 
 export interface DashboardData {
   weekLabel: string;
+  programId: string;
   programName: string;
   programSubtitle: string;
   programProgress: number;
+  programWeeks: number;
+  programCurrentWeek: number;
   metrics: DashboardMetric[];
   sessions: DashboardSession[];
   nutrition: NutritionSummary;

@@ -7,7 +7,10 @@ export type TrainingKind =
   | "strength"
   | "mobility"
   | "recovery"
+  | "walking"
   | "hiking";
+
+export type ActivityEnvironment = "indoor" | "outdoor";
 
 export type TrainingIntensity = "easy" | "moderate" | "hard";
 
@@ -96,6 +99,7 @@ export interface TrainingSession {
   title: string;
   subtitle?: string;
   kind: TrainingKind;
+  environment?: ActivityEnvironment;
   intensity: TrainingIntensity;
   durationMinutes: number;
   status: TrainingStatus;

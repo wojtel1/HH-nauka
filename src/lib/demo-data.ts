@@ -16,7 +16,7 @@ export const familyProfiles: FamilyProfile[] = [
     name: "Wojtek",
     initials: "W",
     role: "owner",
-    focus: "Rower · Rouvy · siła",
+    focus: "Rower indoor/outdoor · siła · spacery",
     device: "Android",
     avatarGradient: "linear-gradient(135deg, #f97316, #9a3412)",
     pinEnabled: true,
@@ -41,7 +41,7 @@ export const familyProfiles: FamilyProfile[] = [
     name: "Kasia",
     initials: "K",
     role: "member",
-    focus: "Aktywność · mobilność · siła",
+    focus: "Outdoor · spacery · hike · siła",
     device: "Android · Samsung",
     avatarGradient: "linear-gradient(135deg, #fb7185, #7c3aed)",
     pinEnabled: true,
@@ -66,7 +66,7 @@ export const familyProfiles: FamilyProfile[] = [
     name: "Maja",
     initials: "M",
     role: "member",
-    focus: "Siłownia · progres · forma",
+    focus: "Siłownia · spacery · hike · forma",
     device: "iPhone",
     avatarGradient: "linear-gradient(135deg, #a78bfa, #2563eb)",
     pinEnabled: true,
@@ -129,8 +129,10 @@ const wojtekWeek = buildBalancedWeek({
   weekOf: "2026-11-19",
   planId: "ftp-builder",
   planName: "FTP Builder",
-  cyclingSessions: 4,
+  cyclingSessions: 3,
+  outdoorCyclingSessions: 1,
   strengthSessions: 2,
+  walkingSessions: 1,
 });
 
 wojtekWeek[0] = {
@@ -156,8 +158,11 @@ const kasiaWeek = buildBalancedWeek({
   profileId: "kasia",
   weekOf: "2026-11-19",
   planId: "winter-balance",
-  cyclingSessions: 1,
+  cyclingSessions: 0,
+  outdoorCyclingSessions: 1,
   strengthSessions: 2,
+  walkingSessions: 1,
+  hikingSessions: 1,
 });
 
 const majaWeek = buildBalancedWeek({
@@ -166,6 +171,8 @@ const majaWeek = buildBalancedWeek({
   planId: "strong-foundations",
   cyclingSessions: 0,
   strengthSessions: 3,
+  walkingSessions: 2,
+  hikingSessions: 1,
 });
 
 export const trainingSessions: TrainingSession[] = [

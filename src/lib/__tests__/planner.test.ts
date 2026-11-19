@@ -48,6 +48,29 @@ describe("buildBalancedWeek", () => {
     }
   });
 
+  it("planuje jazdę outdoor, spacer i hike jako osobne aktywności", () => {
+    const sessions = buildBalancedWeek({
+      profileId: "kasia",
+      weekOf: "2026-11-19",
+      cyclingSessions: 1,
+      outdoorCyclingSessions: 1,
+      strengthSessions: 1,
+      walkingSessions: 1,
+      hikingSessions: 1,
+    });
+
+    expect(sessions).toHaveLength(5);
+    expect(
+      sessions.some(
+        (session) =>
+          session.kind === "cycling" && session.environment === "outdoor",
+      ),
+    ).toBe(true);
+    expect(sessions.some((session) => session.kind === "walking")).toBe(true);
+    expect(sessions.some((session) => session.kind === "hiking")).toBe(true);
+    expect(new Set(sessions.map((session) => session.date)).size).toBe(5);
+  });
+
   it("odrzuca tydzień z więcej niż jedną sesją dziennie", () => {
     expect(() =>
       buildBalancedWeek({
