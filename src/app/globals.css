@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+:root {
+  --background: #07130f;
+  --foreground: #f4f1e8;
+  --surface: #0d211a;
+  --surface-elevated: #143126;
+  --surface-soft: #1a3a2d;
+  --muted: #9fb1a8;
+  --line: rgb(184 199 190 / 0.16);
+  --accent: #ff7a1a;
+  --accent-soft: #ffad5c;
+  --success: #64d49b;
+  --danger: #ff7b76;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-soft: var(--surface-soft);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--background);
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100dvh;
+  margin: 0;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 82% 0%, rgb(255 122 26 / 0.1), transparent 27rem),
+    radial-gradient(circle at 10% 38%, rgb(71 130 100 / 0.13), transparent 34rem),
+    var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgb(255 122 26 / 0.62);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: rgb(255 122 26 / 0.35);
+  color: #fff8ed;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #091812;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid #091812;
+  border-radius: 999px;
+  background: #315344;
+}
+
+.topographic-pattern {
+  background-image:
+    radial-gradient(ellipse at 20% 25%, transparent 0 38px, rgb(190 208 197 / 0.05) 39px 40px, transparent 41px),
+    radial-gradient(ellipse at 75% 70%, transparent 0 54px, rgb(190 208 197 / 0.045) 55px 56px, transparent 57px);
+  background-size: 180px 145px, 225px 185px;
+}
+
+.glass-panel {
+  border: 1px solid var(--line);
+  background: rgb(13 33 26 / 0.86);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 0.24);
+  backdrop-filter: blur(18px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
