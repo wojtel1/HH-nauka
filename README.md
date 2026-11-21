@@ -15,6 +15,7 @@ trzech prywatnych profili: Wojtek, Kasia i Maja.
 - chmurowe profile, programy i treningi zapisywane w Supabase;
 - rower indoor/outdoor, spacery, hiking, siła, mobilność i regeneracja;
 - kończenie programu, rozpoczynanie nowego oraz oznaczanie wykonanych sesji;
+- tygodniowy kalendarz oraz edycja zaplanowanych i wykonanych treningów;
 - przygotowane kanały danych: FIT, Garmin, Health Connect i HealthKit;
 - testy jednostkowe oraz E2E na desktopowym i mobilnym Chromium.
 
@@ -87,7 +88,7 @@ zdjęcia i tokeny integracji nie są jeszcze wysyłane ani przechowywane.
 
 Produkcyjny etap wymaga:
 
-1. edycji istniejących treningów oraz szerszej historii i raportów;
+1. szerszej historii, raportów i celów mierzonych dystansem lub czasem;
 2. serwerowej weryfikacji zaufanego urządzenia, passkeys lub biometrii;
 3. zatwierdzonego dostępu Garmin API;
 4. natywnej obudowy Capacitor dla Health Connect i HealthKit;

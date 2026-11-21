@@ -42,6 +42,13 @@ const sessionSchema = z.object({
   durationMinutes: z.coerce.number().int().min(1).max(1440),
 });
 
+const sessionUpdateSchema = sessionSchema.omit({
+  profileId: true,
+  programId: true,
+}).extend({
+  sessionId: z.string().uuid(),
+});
+
 async function authenticatedClient() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
@@ -227,6 +234,54 @@ export async function createTrainingSession(
   }
   revalidatePath("/cloud");
   return { status: "success", message: "Trening został zapisany." };
+}
+
+export async function updateTrainingSession(
+  _previousState: CloudActionState,
+  formData: FormData,
+): Promise<CloudActionState> {
+  const input = sessionUpdateSchema.safeParse({
+    sessionId: formData.get("sessionId"),
+    scheduledFor: formData.get("scheduledFor"),
+    title: formData.get("title"),
+    subtitle: formData.get("subtitle") ?? "",
+    kind: formData.get("kind"),
+    environment: formData.get("environment") ?? "outdoor",
+    intensity: formData.get("intensity"),
+    durationMinutes: formData.get("durationMinutes"),
+  });
+  if (!input.success) {
+    return { status: "error", message: "Sprawdź dane edytowanego treningu." };
+  }
+
+  const { supabase } = await authenticatedClient();
+  const { data: session } = await supabase
+    .from("training_sessions")
+    .select("id")
+    .eq("id", input.data.sessionId)
+    .maybeSingle();
+  if (!session) {
+    return { status: "error", message: "Nie znaleziono treningu lub nie masz do niego dostępu." };
+  }
+
+  const { error } = await supabase
+    .from("training_sessions")
+    .update({
+      scheduled_for: input.data.scheduledFor,
+      title: input.data.title,
+      subtitle: input.data.subtitle || null,
+      kind: input.data.kind,
+      environment: input.data.environment,
+      intensity: input.data.intensity,
+      duration_minutes: input.data.durationMinutes,
+    })
+    .eq("id", input.data.sessionId);
+
+  if (error) {
+    return { status: "error", message: "Nie udało się zapisać zmian." };
+  }
+  revalidatePath("/cloud");
+  return { status: "success", message: "Zmiany w treningu zostały zapisane." };
 }
 
 export async function setTrainingSessionStatus(formData: FormData) {

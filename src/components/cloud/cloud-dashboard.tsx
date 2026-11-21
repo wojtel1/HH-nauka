@@ -3,8 +3,11 @@
 import {
   Activity,
   Bike,
+  CalendarDays,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CirclePlus,
   Clock3,
   Cloud,
@@ -12,6 +15,7 @@ import {
   Footprints,
   LogOut,
   Mountain,
+  Pencil,
   Plus,
   RotateCcw,
   ShieldCheck,
@@ -25,8 +29,10 @@ import {
   endTrainingProgram,
   setTrainingSessionStatus,
   signOut,
+  updateTrainingSession,
   type CloudActionState,
 } from "@/app/cloud/actions";
+import { addDaysISO, getWeekDates, startOfWeekISO } from "@/lib/training-calendar";
 
 import type { CloudDashboardData, CloudSession } from "./types";
 
@@ -55,6 +61,30 @@ const intensityLabels: Record<CloudSession["intensity"], string> = {
   hard: "mocny",
 };
 
+const statusLabels: Record<CloudSession["status"], string> = {
+  planned: "Zaplanowany",
+  completed: "Wykonany",
+  skipped: "Pominięty",
+  cancelled: "Anulowany",
+};
+
+const dayFormatter = new Intl.DateTimeFormat("pl-PL", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  timeZone: "UTC",
+});
+
+const shortDateFormatter = new Intl.DateTimeFormat("pl-PL", {
+  day: "numeric",
+  month: "short",
+  timeZone: "UTC",
+});
+
+function dateFromISO(value: string) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
 function KindIcon({ kind }: { kind: CloudSession["kind"] }) {
   const className = "size-5";
   if (kind === "cycling") return <Bike aria-hidden="true" className={className} />;
@@ -80,8 +110,142 @@ function ActionMessage({ state }: { state: CloudActionState }) {
   );
 }
 
+function SessionEditor({ session }: { session: CloudSession }) {
+  const [state, action, pending] = useActionState(
+    updateTrainingSession,
+    initialActionState,
+  );
+
+  return (
+    <details className="group mt-3 border-t border-white/8 pt-3">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-[11px] font-bold text-white/45 hover:bg-white/5 hover:text-white/70">
+        <Pencil aria-hidden="true" className="size-3.5" /> Edytuj
+      </summary>
+      <form action={action} className="mt-3 space-y-3 rounded-xl bg-black/15 p-3">
+        <input type="hidden" name="sessionId" value={session.id} />
+        <input
+          className={fieldClass}
+          name="title"
+          required
+          maxLength={160}
+          defaultValue={session.title}
+          aria-label="Nazwa treningu"
+        />
+        <input
+          className={fieldClass}
+          name="subtitle"
+          maxLength={160}
+          defaultValue={session.subtitle ?? ""}
+          placeholder="Opis (opcjonalnie)"
+          aria-label="Opis treningu"
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            className={fieldClass}
+            name="scheduledFor"
+            type="date"
+            defaultValue={session.scheduledFor}
+            required
+            aria-label="Data treningu"
+          />
+          <input
+            className={fieldClass}
+            name="durationMinutes"
+            type="number"
+            min={1}
+            max={1440}
+            defaultValue={session.durationMinutes}
+            required
+            aria-label="Czas w minutach"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <select className={fieldClass} name="kind" defaultValue={session.kind} aria-label="Rodzaj treningu">
+            <option value="cycling">Rower</option><option value="walking">Spacer</option><option value="hiking">Hike</option><option value="strength">Siła</option><option value="mobility">Mobilność</option><option value="recovery">Regeneracja</option>
+          </select>
+          <select className={fieldClass} name="environment" defaultValue={session.environment ?? "outdoor"} aria-label="Środowisko treningu">
+            <option value="outdoor">Na zewnątrz</option><option value="indoor">Wewnątrz</option>
+          </select>
+        </div>
+        <select className={fieldClass} name="intensity" defaultValue={session.intensity} aria-label="Intensywność treningu">
+          <option value="easy">Lekki</option><option value="moderate">Umiarkowany</option><option value="hard">Mocny</option>
+        </select>
+        <ActionMessage state={state} />
+        <button disabled={pending} className="w-full rounded-xl bg-orange-400 px-4 py-3 text-sm font-black text-[#102019] disabled:opacity-50">
+          {pending ? "Zapisywanie…" : "Zapisz zmiany"}
+        </button>
+      </form>
+    </details>
+  );
+}
+
+function SessionCard({ session }: { session: CloudSession }) {
+  const isCompleted = session.status === "completed";
+  const isInactive = session.status === "skipped" || session.status === "cancelled";
+
+  return (
+    <article className={`rounded-2xl border p-3 sm:p-4 ${
+      isCompleted
+        ? "border-emerald-300/15 bg-emerald-300/[.05]"
+        : isInactive
+          ? "border-white/5 bg-black/10 opacity-65"
+          : "border-white/8 bg-black/10"
+    }`}>
+      <div className="flex items-start gap-3">
+        <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${isCompleted ? "bg-emerald-300/15 text-emerald-300" : "bg-orange-300/10 text-orange-300"}`}>
+          <KindIcon kind={session.kind} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="font-black leading-5">{session.title}</p>
+              {session.subtitle ? <p className="mt-1 text-xs text-white/45">{session.subtitle}</p> : null}
+              <p className="mt-1 text-[11px] text-white/35">
+                {kindLabels[session.kind]}{session.environment ? ` · ${session.environment === "outdoor" ? "outdoor" : "indoor"}` : ""}
+              </p>
+            </div>
+            {isCompleted ? <Check aria-label="Ukończony" className="size-5 shrink-0 text-emerald-300" /> : null}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-white/45">
+            <span className="inline-flex items-center gap-1"><Clock3 aria-hidden="true" className="size-3.5" />{session.durationMinutes} min</span>
+            <span>{intensityLabels[session.intensity]}</span>
+            {session.status !== "planned" ? <span className="rounded-full bg-white/5 px-2 py-1">{statusLabels[session.status]}</span> : null}
+          </div>
+          <div className="mt-3 flex gap-2">
+            {!isCompleted ? (
+              <form action={setTrainingSessionStatus}>
+                <input type="hidden" name="sessionId" value={session.id} /><input type="hidden" name="status" value="completed" />
+                <button className="rounded-lg bg-emerald-400/15 px-3 py-2 text-[11px] font-black text-emerald-200">Wykonane</button>
+              </form>
+            ) : (
+              <form action={setTrainingSessionStatus}>
+                <input type="hidden" name="sessionId" value={session.id} /><input type="hidden" name="status" value="planned" />
+                <button aria-label="Cofnij ukończenie" className="rounded-lg border border-white/10 p-2 text-white/40"><RotateCcw aria-hidden="true" className="size-3.5" /></button>
+              </form>
+            )}
+            {session.status === "planned" ? (
+              <form action={setTrainingSessionStatus}>
+                <input type="hidden" name="sessionId" value={session.id} /><input type="hidden" name="status" value="skipped" />
+                <button className="rounded-lg border border-white/10 px-3 py-2 text-[11px] font-bold text-white/40">Pomiń</button>
+              </form>
+            ) : null}
+            {isInactive ? (
+              <form action={setTrainingSessionStatus}>
+                <input type="hidden" name="sessionId" value={session.id} /><input type="hidden" name="status" value="planned" />
+                <button className="rounded-lg border border-white/10 px-3 py-2 text-[11px] font-bold text-white/50">Przywróć</button>
+              </form>
+            ) : null}
+          </div>
+          <SessionEditor session={session} />
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export function CloudDashboard({ data, householdId, today }: CloudDashboardProps) {
   const [selectedProfileId, setSelectedProfileId] = useState(data.profiles[0]?.id ?? "");
+  const [weekStart, setWeekStart] = useState(startOfWeekISO(today));
   const [profileState, profileAction, profilePending] = useActionState(
     addProfile,
     initialActionState,
@@ -106,7 +270,10 @@ export function CloudDashboard({ data, householdId, today }: CloudDashboardProps
     () => data.sessions.filter((session) => session.profileId === profile?.id),
     [data.sessions, profile?.id],
   );
+  const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart]);
+  const currentWeekStart = startOfWeekISO(today);
   const completed = sessions.filter((session) => session.status === "completed");
+  const planned = sessions.filter((session) => session.status === "planned");
   const completedMinutes = completed.reduce((total, session) => total + session.durationMinutes, 0);
 
   if (!profile) return null;
@@ -190,7 +357,7 @@ export function CloudDashboard({ data, householdId, today }: CloudDashboardProps
         <section className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <div className="rounded-2xl border border-white/8 bg-white/[.04] p-4">
             <p className="text-xs text-white/45">Zaplanowane</p>
-            <p className="mt-2 text-2xl font-black">{sessions.length}</p>
+            <p className="mt-2 text-2xl font-black">{planned.length}</p>
           </div>
           <div className="rounded-2xl border border-white/8 bg-white/[.04] p-4">
             <p className="text-xs text-white/45">Ukończone</p>
@@ -319,7 +486,51 @@ export function CloudDashboard({ data, householdId, today }: CloudDashboardProps
               </details>
             </div>
 
-            <div className="mt-5 space-y-2">
+            <div className="mt-5 rounded-2xl border border-white/8 bg-black/10 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setWeekStart((value) => addDaysISO(value, -7))}
+                  aria-label="Poprzedni tydzień"
+                  className="grid size-9 place-items-center rounded-xl border border-white/10 text-white/55 hover:bg-white/5"
+                >
+                  <ChevronLeft aria-hidden="true" className="size-4" />
+                </button>
+                <div className="text-center">
+                  <p className="inline-flex items-center gap-1.5 text-xs font-black text-white/75">
+                    <CalendarDays aria-hidden="true" className="size-4 text-orange-300" />
+                    {shortDateFormatter.format(dateFromISO(weekDates[0]))} – {shortDateFormatter.format(dateFromISO(weekDates[6]))}
+                  </p>
+                  {weekStart !== currentWeekStart ? (
+                    <button type="button" onClick={() => setWeekStart(currentWeekStart)} className="mt-1 block w-full text-[10px] font-bold text-orange-300/80">
+                      Wróć do bieżącego tygodnia
+                    </button>
+                  ) : <p className="mt-1 text-[10px] text-white/30">Bieżący tydzień</p>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWeekStart((value) => addDaysISO(value, 7))}
+                  aria-label="Następny tydzień"
+                  className="grid size-9 place-items-center rounded-xl border border-white/10 text-white/55 hover:bg-white/5"
+                >
+                  <ChevronRight aria-hidden="true" className="size-4" />
+                </button>
+              </div>
+              <div className="mt-3 grid grid-cols-7 gap-1" aria-label="Podsumowanie tygodnia">
+                {weekDates.map((date) => {
+                  const daySessions = sessions.filter((session) => session.scheduledFor === date);
+                  return (
+                    <div key={date} className={`rounded-lg px-1 py-2 text-center ${date === today ? "bg-orange-300/15 text-orange-200" : "bg-white/[.03] text-white/40"}`}>
+                      <p className="text-[9px] font-black uppercase">{dayFormatter.format(dateFromISO(date)).slice(0, 2)}</p>
+                      <p className="mt-0.5 text-xs font-black">{date.slice(-2)}</p>
+                      <span className={`mx-auto mt-1 block size-1.5 rounded-full ${daySessions.length > 0 ? "bg-orange-300" : "bg-white/10"}`} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-5">
               {sessions.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center">
                   <Cloud aria-hidden="true" className="mx-auto size-7 text-white/20" />
@@ -327,46 +538,31 @@ export function CloudDashboard({ data, householdId, today }: CloudDashboardProps
                   <p className="mt-1 text-xs text-white/30">Dodaj pierwszą jazdę, spacer, hike lub trening siłowy.</p>
                 </div>
               ) : (
-                sessions.map((session) => (
-                  <article key={session.id} className={`rounded-2xl border p-3 sm:p-4 ${session.status === "completed" ? "border-emerald-300/15 bg-emerald-300/[.05]" : "border-white/8 bg-black/10"}`}>
-                    <div className="flex items-start gap-3">
-                      <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${session.status === "completed" ? "bg-emerald-300/15 text-emerald-300" : "bg-orange-300/10 text-orange-300"}`}>
-                        <KindIcon kind={session.kind} />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <div><p className="font-black leading-5">{session.title}</p><p className="mt-1 text-[11px] text-white/35">{session.scheduledFor} · {kindLabels[session.kind]}{session.environment ? ` · ${session.environment === "outdoor" ? "outdoor" : "indoor"}` : ""}</p></div>
-                          {session.status === "completed" ? <Check aria-label="Ukończony" className="size-5 shrink-0 text-emerald-300" /> : null}
-                        </div>
-                        <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-white/45">
-                          <span className="inline-flex items-center gap-1"><Clock3 aria-hidden="true" className="size-3.5" />{session.durationMinutes} min</span>
-                          <span>{intensityLabels[session.intensity]}</span>
-                        </div>
-                        <div className="mt-3 flex gap-2">
-                          {session.status !== "completed" ? (
-                            <form action={setTrainingSessionStatus}>
-                              <input type="hidden" name="sessionId" value={session.id} /><input type="hidden" name="status" value="completed" />
-                              <button className="rounded-lg bg-emerald-400/15 px-3 py-2 text-[11px] font-black text-emerald-200">Wykonane</button>
-                            </form>
-                          ) : (
-                            <form action={setTrainingSessionStatus}>
-                              <input type="hidden" name="sessionId" value={session.id} /><input type="hidden" name="status" value="planned" />
-                              <button aria-label="Cofnij ukończenie" className="rounded-lg border border-white/10 p-2 text-white/40"><RotateCcw aria-hidden="true" className="size-3.5" /></button>
-                            </form>
-                          )}
-                          {session.status === "planned" ? (
-                            <form action={setTrainingSessionStatus}>
-                              <input type="hidden" name="sessionId" value={session.id} /><input type="hidden" name="status" value="skipped" />
-                              <button className="rounded-lg border border-white/10 px-3 py-2 text-[11px] font-bold text-white/40">Pomiń</button>
-                            </form>
-                          ) : null}
-                        </div>
+                weekDates.map((date) => {
+                  const daySessions = sessions.filter((session) => session.scheduledFor === date);
+                  if (daySessions.length === 0) return null;
+                  return (
+                    <section key={date} aria-label={dayFormatter.format(dateFromISO(date))}>
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <h3 className="text-xs font-black capitalize text-white/55">{dayFormatter.format(dateFromISO(date))}</h3>
+                        {date === today ? <span className="rounded-full bg-orange-300/10 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-orange-200">Dzisiaj</span> : null}
                       </div>
-                    </div>
-                  </article>
-                ))
+                      <div className="space-y-2">
+                        {daySessions.map((session) => <SessionCard key={session.id} session={session} />)}
+                      </div>
+                    </section>
+                  );
+                })
               )}
             </div>
+
+            {sessions.length > 0 && !sessions.some((session) => weekDates.includes(session.scheduledFor)) ? (
+              <div className="mt-4 rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center">
+                <CalendarDays aria-hidden="true" className="mx-auto size-6 text-white/20" />
+                <p className="mt-2 text-sm font-bold text-white/50">Brak treningów w tym tygodniu</p>
+                <p className="mt-1 text-xs text-white/30">Przejdź do innego tygodnia albo dodaj nowy trening.</p>
+              </div>
+            ) : null}
           </section>
         </div>
 
