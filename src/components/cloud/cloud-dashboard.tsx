@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  BarChart3,
   Bike,
   CalendarDays,
   Check,
@@ -13,17 +14,20 @@ import {
   Cloud,
   Dumbbell,
   Footprints,
+  Gauge,
   LogOut,
   Mountain,
   Pencil,
   Plus,
   RotateCcw,
+  Route,
   ShieldCheck,
 } from "lucide-react";
 import { useActionState, useMemo, useState } from "react";
 
 import {
   addProfile,
+  completeTrainingSession,
   createProgram,
   createTrainingSession,
   endTrainingProgram,
@@ -33,6 +37,7 @@ import {
   type CloudActionState,
 } from "@/app/cloud/actions";
 import { addDaysISO, getWeekDates, startOfWeekISO } from "@/lib/training-calendar";
+import { buildWeeklyTrainingReport } from "@/lib/training-report";
 
 import type { CloudDashboardData, CloudSession } from "./types";
 
@@ -179,6 +184,47 @@ function SessionEditor({ session }: { session: CloudSession }) {
   );
 }
 
+function CompletionForm({ session }: { session: CloudSession }) {
+  const [state, action, pending] = useActionState(
+    completeTrainingSession,
+    initialActionState,
+  );
+  const isCompleted = session.status === "completed";
+
+  return (
+    <details className="mt-3 rounded-xl bg-emerald-400/[.06]">
+      <summary className="cursor-pointer list-none rounded-xl px-3 py-2.5 text-[11px] font-black text-emerald-200 hover:bg-emerald-400/10">
+        {isCompleted ? "Edytuj wynik treningu" : "Zakończ i zapisz wynik"}
+      </summary>
+      <form action={action} className="space-y-3 border-t border-emerald-300/10 p-3">
+        <input type="hidden" name="sessionId" value={session.id} />
+        <div className="grid grid-cols-2 gap-2">
+          <label className="text-[10px] font-bold text-white/45">
+            Dystans (km)
+            <input className={`${fieldClass} mt-1`} name="distanceKm" type="number" min={0} max={10000} step="0.01" defaultValue={session.metrics.distanceKm ?? ""} placeholder="np. 32,5" />
+          </label>
+          <label className="text-[10px] font-bold text-white/45">
+            Przewyższenie (m)
+            <input className={`${fieldClass} mt-1`} name="elevationMeters" type="number" min={0} max={20000} step="1" defaultValue={session.metrics.elevationMeters ?? ""} placeholder="np. 420" />
+          </label>
+        </div>
+        <label className="block text-[10px] font-bold text-white/45">
+          Odczuwany wysiłek (1–10)
+          <input className={`${fieldClass} mt-1`} name="perceivedEffort" type="number" min={1} max={10} step="1" defaultValue={session.metrics.perceivedEffort ?? ""} placeholder="np. 6" />
+        </label>
+        <label className="block text-[10px] font-bold text-white/45">
+          Notatka po treningu
+          <textarea className={`${fieldClass} mt-1`} name="notes" maxLength={1000} rows={3} defaultValue={session.metrics.notes} placeholder="Jak się czułeś? Co warto zapamiętać?" />
+        </label>
+        <ActionMessage state={state} />
+        <button disabled={pending} className="w-full rounded-xl bg-emerald-400 px-4 py-3 text-sm font-black text-[#102019] disabled:opacity-50">
+          {pending ? "Zapisywanie…" : isCompleted ? "Zapisz poprawiony wynik" : "Oznacz jako wykonany"}
+        </button>
+      </form>
+    </details>
+  );
+}
+
 function SessionCard({ session }: { session: CloudSession }) {
   const isCompleted = session.status === "completed";
   const isInactive = session.status === "skipped" || session.status === "cancelled";
@@ -211,18 +257,21 @@ function SessionCard({ session }: { session: CloudSession }) {
             <span>{intensityLabels[session.intensity]}</span>
             {session.status !== "planned" ? <span className="rounded-full bg-white/5 px-2 py-1">{statusLabels[session.status]}</span> : null}
           </div>
+          {isCompleted && (session.metrics.distanceKm !== null || session.metrics.elevationMeters !== null || session.metrics.perceivedEffort !== null) ? (
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-bold text-emerald-100/70">
+              {session.metrics.distanceKm !== null ? <span>{session.metrics.distanceKm.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} km</span> : null}
+              {session.metrics.elevationMeters !== null ? <span>↗ {session.metrics.elevationMeters.toLocaleString("pl-PL")} m</span> : null}
+              {session.metrics.perceivedEffort !== null ? <span>RPE {session.metrics.perceivedEffort}/10</span> : null}
+            </div>
+          ) : null}
+          {isCompleted && session.metrics.notes ? <p className="mt-3 rounded-lg bg-black/10 px-3 py-2 text-xs leading-5 text-white/45">{session.metrics.notes}</p> : null}
           <div className="mt-3 flex gap-2">
-            {!isCompleted ? (
-              <form action={setTrainingSessionStatus}>
-                <input type="hidden" name="sessionId" value={session.id} /><input type="hidden" name="status" value="completed" />
-                <button className="rounded-lg bg-emerald-400/15 px-3 py-2 text-[11px] font-black text-emerald-200">Wykonane</button>
-              </form>
-            ) : (
+            {isCompleted ? (
               <form action={setTrainingSessionStatus}>
                 <input type="hidden" name="sessionId" value={session.id} /><input type="hidden" name="status" value="planned" />
                 <button aria-label="Cofnij ukończenie" className="rounded-lg border border-white/10 p-2 text-white/40"><RotateCcw aria-hidden="true" className="size-3.5" /></button>
               </form>
-            )}
+            ) : null}
             {session.status === "planned" ? (
               <form action={setTrainingSessionStatus}>
                 <input type="hidden" name="sessionId" value={session.id} /><input type="hidden" name="status" value="skipped" />
@@ -236,6 +285,7 @@ function SessionCard({ session }: { session: CloudSession }) {
               </form>
             ) : null}
           </div>
+          {session.status !== "cancelled" ? <CompletionForm session={session} /> : null}
           <SessionEditor session={session} />
         </div>
       </div>
@@ -272,6 +322,9 @@ export function CloudDashboard({ data, householdId, today }: CloudDashboardProps
   );
   const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart]);
   const currentWeekStart = startOfWeekISO(today);
+  const weeklyTarget = activeProgram?.sessionsPerWeek
+    ?? sessions.filter((session) => weekDates.includes(session.scheduledFor)).length;
+  const weeklyReport = buildWeeklyTrainingReport(sessions, weekDates, weeklyTarget);
   const completed = sessions.filter((session) => session.status === "completed");
   const planned = sessions.filter((session) => session.status === "planned");
   const completedMinutes = completed.reduce((total, session) => total + session.durationMinutes, 0);
@@ -529,6 +582,42 @@ export function CloudDashboard({ data, householdId, today }: CloudDashboardProps
                 })}
               </div>
             </div>
+
+            <section className="mt-4 rounded-2xl border border-orange-300/10 bg-orange-300/[.04] p-4" aria-label="Raport tygodniowy">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[.16em] text-orange-300/70">Raport tygodniowy</p>
+                  <h3 className="mt-1 text-base font-black">{weeklyReport.completed} z {weeklyTarget || 0} treningów celu</h3>
+                </div>
+                <span className="grid size-10 place-items-center rounded-xl bg-orange-300/10 text-orange-300">
+                  <BarChart3 aria-hidden="true" className="size-5" />
+                </span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/8">
+                <div className="h-full rounded-full bg-orange-400 transition-[width]" style={{ width: `${weeklyReport.targetProgressPercent}%` }} />
+              </div>
+              <p className="mt-2 text-[10px] text-white/35">
+                Realizacja celu: {weeklyReport.targetProgressPercent}% · zaplanowane {weeklyReport.scheduled} · pominięte {weeklyReport.skipped}
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded-xl bg-black/15 p-3">
+                  <p className="text-[10px] text-white/35">Aktywny czas</p>
+                  <p className="mt-1 text-sm font-black">{Math.floor(weeklyReport.completedMinutes / 60)}h {weeklyReport.completedMinutes % 60}m</p>
+                </div>
+                <div className="rounded-xl bg-black/15 p-3">
+                  <p className="inline-flex items-center gap-1 text-[10px] text-white/35"><Route aria-hidden="true" className="size-3" /> Dystans</p>
+                  <p className="mt-1 text-sm font-black">{weeklyReport.distanceKm.toLocaleString("pl-PL", { maximumFractionDigits: 1 })} km</p>
+                </div>
+                <div className="rounded-xl bg-black/15 p-3">
+                  <p className="inline-flex items-center gap-1 text-[10px] text-white/35"><Mountain aria-hidden="true" className="size-3" /> Przewyższenie</p>
+                  <p className="mt-1 text-sm font-black">{weeklyReport.elevationMeters.toLocaleString("pl-PL")} m</p>
+                </div>
+                <div className="rounded-xl bg-black/15 p-3">
+                  <p className="inline-flex items-center gap-1 text-[10px] text-white/35"><Gauge aria-hidden="true" className="size-3" /> Śr. wysiłek</p>
+                  <p className="mt-1 text-sm font-black">{weeklyReport.averageEffort === null ? "—" : `${weeklyReport.averageEffort.toLocaleString("pl-PL", { maximumFractionDigits: 1 })}/10`}</p>
+                </div>
+              </div>
+            </section>
 
             <div className="mt-4 space-y-5">
               {sessions.length === 0 ? (

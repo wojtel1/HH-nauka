@@ -49,6 +49,19 @@ const sessionUpdateSchema = sessionSchema.omit({
   sessionId: z.string().uuid(),
 });
 
+const optionalNumber = (minimum: number, maximum: number) => z.preprocess(
+  (value) => value === "" || value === null ? undefined : value,
+  z.coerce.number().min(minimum).max(maximum).optional(),
+);
+
+const completionSchema = z.object({
+  sessionId: z.string().uuid(),
+  distanceKm: optionalNumber(0, 10000),
+  elevationMeters: optionalNumber(0, 20000),
+  perceivedEffort: optionalNumber(1, 10),
+  notes: z.string().trim().max(1000),
+});
+
 async function authenticatedClient() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
@@ -66,6 +79,24 @@ async function profileIsAccessible(
     .eq("id", profileId)
     .maybeSingle();
   return Boolean(data);
+}
+
+async function refreshProgramProgress(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  programId: string | null,
+) {
+  if (!programId) return;
+  const { data: programSessions } = await supabase
+    .from("training_sessions")
+    .select("status")
+    .eq("program_id", programId);
+  const progress = calculateProgramProgress(
+    programSessions?.map((item) => item.status) ?? [],
+  );
+  await supabase
+    .from("training_programs")
+    .update({ progress_percent: progress })
+    .eq("id", programId);
 }
 
 const workspaceSchema = z.object({
@@ -284,6 +315,53 @@ export async function updateTrainingSession(
   return { status: "success", message: "Zmiany w treningu zostały zapisane." };
 }
 
+export async function completeTrainingSession(
+  _previousState: CloudActionState,
+  formData: FormData,
+): Promise<CloudActionState> {
+  const input = completionSchema.safeParse({
+    sessionId: formData.get("sessionId"),
+    distanceKm: formData.get("distanceKm"),
+    elevationMeters: formData.get("elevationMeters"),
+    perceivedEffort: formData.get("perceivedEffort"),
+    notes: formData.get("notes") ?? "",
+  });
+  if (!input.success) {
+    return { status: "error", message: "Sprawdź wyniki treningu. Wysiłek powinien mieć wartość od 1 do 10." };
+  }
+
+  const { supabase } = await authenticatedClient();
+  const { data: session } = await supabase
+    .from("training_sessions")
+    .select("id, program_id")
+    .eq("id", input.data.sessionId)
+    .maybeSingle();
+  if (!session) {
+    return { status: "error", message: "Nie znaleziono treningu lub nie masz do niego dostępu." };
+  }
+
+  const { error } = await supabase
+    .from("training_sessions")
+    .update({
+      status: "completed",
+      completed_at: new Date().toISOString(),
+      metrics: {
+        distanceKm: input.data.distanceKm ?? null,
+        elevationMeters: input.data.elevationMeters ?? null,
+        perceivedEffort: input.data.perceivedEffort ?? null,
+        notes: input.data.notes,
+      },
+    })
+    .eq("id", input.data.sessionId);
+  if (error) {
+    return { status: "error", message: "Nie udało się zapisać wyniku treningu." };
+  }
+
+  await refreshProgramProgress(supabase, session.program_id);
+  revalidatePath("/cloud");
+  return { status: "success", message: "Trening i jego wyniki zostały zapisane." };
+}
+
 export async function setTrainingSessionStatus(formData: FormData) {
   const parsed = z.object({
     sessionId: z.string().uuid(),
@@ -310,19 +388,7 @@ export async function setTrainingSessionStatus(formData: FormData) {
     })
     .eq("id", parsed.data.sessionId);
 
-  if (session.program_id) {
-    const { data: programSessions } = await supabase
-      .from("training_sessions")
-      .select("status")
-      .eq("program_id", session.program_id);
-    const progress = calculateProgramProgress(
-      programSessions?.map((item) => item.status) ?? [],
-    );
-    await supabase
-      .from("training_programs")
-      .update({ progress_percent: progress })
-      .eq("id", session.program_id);
-  }
+  await refreshProgramProgress(supabase, session.program_id);
   revalidatePath("/cloud");
 }
 

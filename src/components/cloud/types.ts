@@ -33,6 +33,13 @@ export interface CloudSession {
   intensity: "easy" | "moderate" | "hard";
   durationMinutes: number;
   status: "planned" | "completed" | "skipped" | "cancelled";
+  completedAt: string | null;
+  metrics: {
+    distanceKm: number | null;
+    elevationMeters: number | null;
+    perceivedEffort: number | null;
+    notes: string;
+  };
 }
 
 export interface CloudDashboardData {

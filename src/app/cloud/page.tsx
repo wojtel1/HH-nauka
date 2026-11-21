@@ -76,7 +76,7 @@ export default async function CloudAppPage() {
           .order("created_at", { ascending: false }),
         supabase
           .from("training_sessions")
-          .select("id, profile_id, program_id, scheduled_for, title, subtitle, kind, environment, intensity, duration_minutes, status")
+          .select("id, profile_id, program_id, scheduled_for, title, subtitle, kind, environment, intensity, duration_minutes, status, completed_at, metrics")
           .in("profile_id", profileIds)
           .order("scheduled_for", { ascending: true })
           .limit(200),
@@ -102,19 +102,31 @@ export default async function CloudAppPage() {
     endReason: program.end_reason,
   }));
 
-  const sessions: CloudSession[] = (sessionsResult.data ?? []).map((session) => ({
-    id: session.id,
-    profileId: session.profile_id,
-    programId: session.program_id,
-    scheduledFor: session.scheduled_for,
-    title: session.title,
-    subtitle: session.subtitle,
-    kind: session.kind,
-    environment: session.environment,
-    intensity: session.intensity,
-    durationMinutes: session.duration_minutes,
-    status: session.status,
-  }));
+  const sessions: CloudSession[] = (sessionsResult.data ?? []).map((session) => {
+    const metrics = session.metrics && typeof session.metrics === "object"
+      ? (session.metrics as Record<string, unknown>)
+      : {};
+    return {
+      id: session.id,
+      profileId: session.profile_id,
+      programId: session.program_id,
+      scheduledFor: session.scheduled_for,
+      title: session.title,
+      subtitle: session.subtitle,
+      kind: session.kind,
+      environment: session.environment,
+      intensity: session.intensity,
+      durationMinutes: session.duration_minutes,
+      status: session.status,
+      completedAt: session.completed_at,
+      metrics: {
+        distanceKm: typeof metrics.distanceKm === "number" ? metrics.distanceKm : null,
+        elevationMeters: typeof metrics.elevationMeters === "number" ? metrics.elevationMeters : null,
+        perceivedEffort: typeof metrics.perceivedEffort === "number" ? metrics.perceivedEffort : null,
+        notes: typeof metrics.notes === "string" ? metrics.notes : "",
+      },
+    };
+  });
 
   return (
     <CloudDashboard
