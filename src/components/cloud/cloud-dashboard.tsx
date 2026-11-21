@@ -39,6 +39,7 @@ import {
 import { addDaysISO, getWeekDates, startOfWeekISO } from "@/lib/training-calendar";
 import { buildWeeklyTrainingReport } from "@/lib/training-report";
 
+import { TrainingTrends } from "./training-trends";
 import type { CloudDashboardData, CloudSession } from "./types";
 
 interface CloudDashboardProps {
@@ -425,6 +426,12 @@ export function CloudDashboard({ data, householdId, today }: CloudDashboardProps
             <p className="mt-2 text-2xl font-black text-orange-300">{activeProgram?.progressPercent ?? 0}%</p>
           </div>
         </section>
+
+        <TrainingTrends
+          sessions={sessions}
+          targetSessions={activeProgram?.sessionsPerWeek ?? 0}
+          today={today}
+        />
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[.9fr_1.4fr]">
           <section className="rounded-[1.75rem] border border-white/10 bg-[#10251d]/80 p-5">

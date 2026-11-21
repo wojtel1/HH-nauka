@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildWeeklyTrainingReport, type ReportSession } from "@/lib/training-report";
+import {
+  buildTrainingTrend,
+  buildWeeklyTrainingReport,
+  calculateTrainingStreak,
+  type ReportSession,
+} from "@/lib/training-report";
 
 const week = ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20", "2026-11-21", "2026-11-22"];
 
@@ -47,5 +52,35 @@ describe("weekly training report", () => {
     expect(report.averageEffort).toBeNull();
     expect(report.distanceKm).toBe(0);
     expect(report.targetProgressPercent).toBe(0);
+  });
+});
+
+describe("multi-week training trend", () => {
+  it("builds oldest-to-newest weekly points", () => {
+    const trend = buildTrainingTrend([
+      session({ scheduledFor: "2026-11-10", status: "completed" }),
+      session({ scheduledFor: "2026-11-18", status: "completed" }),
+    ], "2026-11-21", 2, 3);
+
+    expect(trend.map((point) => point.weekStart)).toEqual(["2026-11-09", "2026-11-16"]);
+    expect(trend.map((point) => point.completed)).toEqual([1, 1]);
+  });
+
+  it("counts a current streak and tolerates an empty week in progress", () => {
+    const trend = buildTrainingTrend([
+      session({ scheduledFor: "2026-11-04", status: "completed" }),
+      session({ scheduledFor: "2026-11-11", status: "completed" }),
+    ], "2026-11-21", 3, 3);
+
+    expect(calculateTrainingStreak(trend)).toBe(2);
+  });
+
+  it("stops a streak at the first inactive completed week", () => {
+    const trend = buildTrainingTrend([
+      session({ scheduledFor: "2026-11-04", status: "completed" }),
+      session({ scheduledFor: "2026-11-18", status: "completed" }),
+    ], "2026-11-21", 3, 3);
+
+    expect(calculateTrainingStreak(trend)).toBe(1);
   });
 });

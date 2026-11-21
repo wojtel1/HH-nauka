@@ -79,7 +79,7 @@ export default async function CloudAppPage() {
           .select("id, profile_id, program_id, scheduled_for, title, subtitle, kind, environment, intensity, duration_minutes, status, completed_at, metrics")
           .in("profile_id", profileIds)
           .order("scheduled_for", { ascending: true })
-          .limit(200),
+          .limit(1000),
       ])
     : [{ data: [], error: null }, { data: [], error: null }];
 

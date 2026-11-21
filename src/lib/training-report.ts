@@ -1,3 +1,5 @@
+import { addDaysISO, getWeekDates, startOfWeekISO } from "@/lib/training-calendar";
+
 export interface ReportSession {
   durationMinutes: number;
   metrics: {
@@ -18,6 +20,11 @@ export interface WeeklyTrainingReport {
   elevationMeters: number;
   averageEffort: number | null;
   targetProgressPercent: number;
+}
+
+export interface TrainingTrendPoint extends WeeklyTrainingReport {
+  weekStart: string;
+  weekEnd: string;
 }
 
 export function buildWeeklyTrainingReport(
@@ -56,4 +63,36 @@ export function buildWeeklyTrainingReport(
       ? Math.min(100, Math.round((completedSessions.length / targetSessions) * 100))
       : 0,
   };
+}
+
+export function buildTrainingTrend(
+  sessions: ReportSession[],
+  anchorDate: string,
+  numberOfWeeks: number,
+  targetSessions: number,
+) {
+  const currentWeek = startOfWeekISO(anchorDate);
+  return Array.from({ length: numberOfWeeks }, (_, index) => {
+    const weeksAgo = numberOfWeeks - index - 1;
+    const weekStart = addDaysISO(currentWeek, weeksAgo * -7);
+    const weekDates = getWeekDates(weekStart);
+    return {
+      weekStart,
+      weekEnd: weekDates[6],
+      ...buildWeeklyTrainingReport(sessions, weekDates, targetSessions),
+    } satisfies TrainingTrendPoint;
+  });
+}
+
+export function calculateTrainingStreak(points: TrainingTrendPoint[]) {
+  if (points.length === 0) return 0;
+  let index = points.length - 1;
+  if (points[index].completed === 0) index -= 1;
+
+  let streak = 0;
+  while (index >= 0 && points[index].completed > 0) {
+    streak += 1;
+    index -= 1;
+  }
+  return streak;
 }

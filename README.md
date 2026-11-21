@@ -18,6 +18,7 @@ trzech prywatnych profili: Wojtek, Kasia i Maja.
 - tygodniowy kalendarz oraz edycja zaplanowanych i wykonanych treningów;
 - wyniki treningu: dystans, przewyższenie, RPE i prywatna notatka;
 - tygodniowe raporty realizacji celu, czasu, dystansu i obciążenia;
+- ośmiotygodniowy wykres progresu, seria regularności i rekordy treningowe;
 - przygotowane kanały danych: FIT, Garmin, Health Connect i HealthKit;
 - testy jednostkowe oraz E2E na desktopowym i mobilnym Chromium.
 
@@ -90,7 +91,7 @@ zdjęcia i tokeny integracji nie są jeszcze wysyłane ani przechowywane.
 
 Produkcyjny etap wymaga:
 
-1. celów mierzonych dystansem lub czasem oraz raportów wielotygodniowych;
+1. edytowalnych celów mierzonych dystansem lub czasem;
 2. serwerowej weryfikacji zaufanego urządzenia, passkeys lub biometrii;
 3. zatwierdzonego dostępu Garmin API;
 4. natywnej obudowy Capacitor dla Health Connect i HealthKit;
