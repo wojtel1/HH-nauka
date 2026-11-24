@@ -6,6 +6,8 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { calculateProgramProgress } from "@/lib/cloud-progress";
+import { addDaysISO, startOfWeekISO } from "@/lib/training-calendar";
+import { generateWeeklyTrainingPlan } from "@/lib/training-plan";
 
 export interface WorkspaceActionState {
   message: string;
@@ -28,6 +30,17 @@ const programSchema = z.object({
   goal: z.string().trim().max(240),
   weeks: z.coerce.number().int().min(1).max(104),
   sessionsPerWeek: z.coerce.number().int().min(1).max(14),
+});
+
+const programUpdateSchema = programSchema.omit({ profileId: true }).extend({
+  programId: z.string().uuid(),
+});
+
+const planGeneratorSchema = z.object({
+  profileId: z.string().uuid(),
+  programId: z.string().uuid(),
+  weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  focus: z.enum(["balanced", "cycling", "outdoor", "recovery"]),
 });
 
 const sessionSchema = z.object({
@@ -212,6 +225,116 @@ export async function createProgram(
   }
   revalidatePath("/cloud");
   return { status: "success", message: "Nowy program został rozpoczęty." };
+}
+
+export async function updateTrainingProgram(
+  _previousState: CloudActionState,
+  formData: FormData,
+): Promise<CloudActionState> {
+  const input = programUpdateSchema.safeParse({
+    programId: formData.get("programId"),
+    title: formData.get("title"),
+    goal: formData.get("goal") ?? "",
+    weeks: formData.get("weeks"),
+    sessionsPerWeek: formData.get("sessionsPerWeek"),
+  });
+  if (!input.success) {
+    return { status: "error", message: "Sprawdź nazwę, długość programu i liczbę treningów." };
+  }
+
+  const { supabase } = await authenticatedClient();
+  const { data: program } = await supabase
+    .from("training_programs")
+    .select("id")
+    .eq("id", input.data.programId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!program) {
+    return { status: "error", message: "Nie znaleziono aktywnego programu lub nie masz do niego dostępu." };
+  }
+
+  const { error } = await supabase
+    .from("training_programs")
+    .update({
+      title: input.data.title,
+      goal: input.data.goal,
+      weeks: input.data.weeks,
+      sessions_per_week: input.data.sessionsPerWeek,
+    })
+    .eq("id", input.data.programId)
+    .eq("status", "active");
+  if (error) {
+    return { status: "error", message: "Nie udało się zaktualizować programu." };
+  }
+  revalidatePath("/cloud");
+  return { status: "success", message: "Program został zaktualizowany." };
+}
+
+export async function generateTrainingWeek(
+  _previousState: CloudActionState,
+  formData: FormData,
+): Promise<CloudActionState> {
+  const input = planGeneratorSchema.safeParse({
+    profileId: formData.get("profileId"),
+    programId: formData.get("programId"),
+    weekStart: formData.get("weekStart"),
+    focus: formData.get("focus"),
+  });
+  if (!input.success) {
+    return { status: "error", message: "Wybierz poprawny tydzień i kierunek planu." };
+  }
+
+  const { supabase } = await authenticatedClient();
+  const { data: program } = await supabase
+    .from("training_programs")
+    .select("id, profile_id, sessions_per_week, status")
+    .eq("id", input.data.programId)
+    .maybeSingle();
+  if (!program || program.profile_id !== input.data.profileId || program.status !== "active") {
+    return { status: "error", message: "Generator wymaga aktywnego programu tego profilu." };
+  }
+
+  const weekStart = startOfWeekISO(input.data.weekStart);
+  const weekEnd = addDaysISO(weekStart, 6);
+  const { count, error: countError } = await supabase
+    .from("training_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("profile_id", input.data.profileId)
+    .gte("scheduled_for", weekStart)
+    .lte("scheduled_for", weekEnd);
+  if (countError) {
+    return { status: "error", message: "Nie udało się sprawdzić wybranego tygodnia." };
+  }
+  if ((count ?? 0) > 0) {
+    return { status: "error", message: "Ten tydzień ma już treningi. Wybierz pusty tydzień, aby uniknąć duplikatów." };
+  }
+
+  const generated = generateWeeklyTrainingPlan(
+    weekStart,
+    program.sessions_per_week,
+    input.data.focus,
+  );
+  const { error } = await supabase.from("training_sessions").insert(
+    generated.map((session) => ({
+      profile_id: input.data.profileId,
+      program_id: input.data.programId,
+      scheduled_for: session.scheduledFor,
+      title: session.title,
+      subtitle: session.subtitle,
+      kind: session.kind,
+      environment: session.environment,
+      intensity: session.intensity,
+      duration_minutes: session.durationMinutes,
+      status: "planned",
+      source: "endurance-generator",
+    })),
+  );
+  if (error) {
+    return { status: "error", message: "Nie udało się zapisać wygenerowanego tygodnia." };
+  }
+
+  revalidatePath("/cloud");
+  return { status: "success", message: `Utworzono ${generated.length} treningów na wybrany tydzień.` };
 }
 
 export async function createTrainingSession(

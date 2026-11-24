@@ -21,7 +21,9 @@ import {
   Plus,
   RotateCcw,
   Route,
+  Settings2,
   ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import { useActionState, useMemo, useState } from "react";
 
@@ -31,8 +33,10 @@ import {
   createProgram,
   createTrainingSession,
   endTrainingProgram,
+  generateTrainingWeek,
   setTrainingSessionStatus,
   signOut,
+  updateTrainingProgram,
   updateTrainingSession,
   type CloudActionState,
 } from "@/app/cloud/actions";
@@ -309,6 +313,14 @@ export function CloudDashboard({ data, householdId, today }: CloudDashboardProps
     createTrainingSession,
     initialActionState,
   );
+  const [programEditState, programEditAction, programEditPending] = useActionState(
+    updateTrainingProgram,
+    initialActionState,
+  );
+  const [generatorState, generatorAction, generatorPending] = useActionState(
+    generateTrainingWeek,
+    initialActionState,
+  );
 
   const profile = data.profiles.find((item) => item.id === selectedProfileId) ?? data.profiles[0];
   const profilePrograms = useMemo(
@@ -468,6 +480,53 @@ export function CloudDashboard({ data, householdId, today }: CloudDashboardProps
                     <input type="hidden" name="outcome" value="abandoned" />
                     <button className="w-full rounded-xl border border-white/10 px-3 py-3 text-xs font-black text-white/55 hover:bg-white/5">
                       Zmień program
+                    </button>
+                  </form>
+                </div>
+
+                <details className="mt-4 border-t border-white/8 pt-4">
+                  <summary className="inline-flex cursor-pointer list-none items-center gap-2 text-xs font-black text-white/45 hover:text-white/70">
+                    <Settings2 aria-hidden="true" className="size-4" /> Edytuj program i cel
+                  </summary>
+                  <form action={programEditAction} className="mt-3 space-y-3 rounded-xl bg-black/15 p-3">
+                    <input type="hidden" name="programId" value={activeProgram.id} />
+                    <input className={fieldClass} name="title" required maxLength={120} defaultValue={activeProgram.title} aria-label="Nazwa programu" />
+                    <textarea className={fieldClass} name="goal" maxLength={240} defaultValue={activeProgram.goal} rows={3} aria-label="Cel programu" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="text-[10px] font-bold text-white/45">Tygodnie<input className={`${fieldClass} mt-1`} name="weeks" type="number" min={1} max={104} defaultValue={activeProgram.weeks} required /></label>
+                      <label className="text-[10px] font-bold text-white/45">Sesje / tydz.<input className={`${fieldClass} mt-1`} name="sessionsPerWeek" type="number" min={1} max={14} defaultValue={activeProgram.sessionsPerWeek} required /></label>
+                    </div>
+                    <ActionMessage state={programEditState} />
+                    <button disabled={programEditPending} className="w-full rounded-xl bg-white/10 px-4 py-3 text-sm font-black text-white/80 disabled:opacity-50">
+                      {programEditPending ? "Zapisywanie…" : "Zapisz program"}
+                    </button>
+                  </form>
+                </details>
+
+                <div className="mt-4 rounded-2xl border border-orange-300/15 bg-orange-300/[.05] p-3">
+                  <div className="flex items-start gap-2">
+                    <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-orange-300" />
+                    <div>
+                      <p className="text-xs font-black text-orange-100">Automatyczny plan tygodnia</p>
+                      <p className="mt-1 text-[10px] leading-4 text-white/35">Generator użyje celu {activeProgram.sessionsPerWeek} sesji i nie zmieni tygodnia, który ma już treningi.</p>
+                    </div>
+                  </div>
+                  <form action={generatorAction} className="mt-3 space-y-2">
+                    <input type="hidden" name="profileId" value={profile.id} />
+                    <input type="hidden" name="programId" value={activeProgram.id} />
+                    <label className="block text-[10px] font-bold text-white/45">
+                      Tydzień rozpoczynający się
+                      <input className={`${fieldClass} mt-1`} name="weekStart" type="date" value={weekStart} onChange={(event) => { if (event.target.value) setWeekStart(startOfWeekISO(event.target.value)); }} required />
+                    </label>
+                    <select className={fieldClass} name="focus" defaultValue="balanced" aria-label="Kierunek automatycznego planu">
+                      <option value="balanced">Plan zbalansowany</option>
+                      <option value="cycling">Priorytet rowerowy</option>
+                      <option value="outdoor">Więcej aktywności outdoor</option>
+                      <option value="recovery">Lekki tydzień regeneracyjny</option>
+                    </select>
+                    <ActionMessage state={generatorState} />
+                    <button disabled={generatorPending} className="w-full rounded-xl bg-orange-400 px-4 py-3 text-sm font-black text-[#102019] disabled:opacity-50">
+                      {generatorPending ? "Układanie planu…" : "Wygeneruj ten tydzień"}
                     </button>
                   </form>
                 </div>
