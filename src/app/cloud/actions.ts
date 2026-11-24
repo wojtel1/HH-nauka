@@ -39,7 +39,8 @@ const programUpdateSchema = programSchema.omit({ profileId: true }).extend({
 const planGeneratorSchema = z.object({
   profileId: z.string().uuid(),
   programId: z.string().uuid(),
-  weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  weekStart: z.iso.date(),
+  sessionsPerWeek: z.coerce.number().int().min(1).max(14),
   focus: z.enum(["balanced", "cycling", "outdoor", "recovery"]),
 });
 
@@ -278,6 +279,7 @@ export async function generateTrainingWeek(
     profileId: formData.get("profileId"),
     programId: formData.get("programId"),
     weekStart: formData.get("weekStart"),
+    sessionsPerWeek: formData.get("sessionsPerWeek"),
     focus: formData.get("focus"),
   });
   if (!input.success) {
@@ -292,6 +294,10 @@ export async function generateTrainingWeek(
     .maybeSingle();
   if (!program || program.profile_id !== input.data.profileId || program.status !== "active") {
     return { status: "error", message: "Generator wymaga aktywnego programu tego profilu." };
+  }
+  if (program.sessions_per_week !== input.data.sessionsPerWeek) {
+    revalidatePath("/cloud");
+    return { status: "error", message: "Liczba sesji w programie się zmieniła. Sprawdź odświeżony podgląd i zapisz ponownie." };
   }
 
   const weekStart = startOfWeekISO(input.data.weekStart);

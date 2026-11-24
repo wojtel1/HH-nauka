@@ -41,6 +41,7 @@ import {
   type CloudActionState,
 } from "@/app/cloud/actions";
 import { addDaysISO, getWeekDates, startOfWeekISO } from "@/lib/training-calendar";
+import { generateWeeklyTrainingPlan, type PlanFocus } from "@/lib/training-plan";
 import { buildWeeklyTrainingReport } from "@/lib/training-report";
 
 import { TrainingTrends } from "./training-trends";
@@ -301,6 +302,7 @@ function SessionCard({ session }: { session: CloudSession }) {
 export function CloudDashboard({ data, householdId, today }: CloudDashboardProps) {
   const [selectedProfileId, setSelectedProfileId] = useState(data.profiles[0]?.id ?? "");
   const [weekStart, setWeekStart] = useState(startOfWeekISO(today));
+  const [planFocus, setPlanFocus] = useState<PlanFocus>("balanced");
   const [profileState, profileAction, profilePending] = useActionState(
     addProfile,
     initialActionState,
@@ -334,6 +336,10 @@ export function CloudDashboard({ data, householdId, today }: CloudDashboardProps
     [data.sessions, profile?.id],
   );
   const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart]);
+  const weekHasSessions = sessions.some((session) => weekDates.includes(session.scheduledFor));
+  const proposedSessions = activeProgram && !weekHasSessions
+    ? generateWeeklyTrainingPlan(weekStart, activeProgram.sessionsPerWeek, planFocus)
+    : [];
   const currentWeekStart = startOfWeekISO(today);
   const weeklyTarget = activeProgram?.sessionsPerWeek
     ?? sessions.filter((session) => weekDates.includes(session.scheduledFor)).length;
@@ -514,19 +520,46 @@ export function CloudDashboard({ data, householdId, today }: CloudDashboardProps
                   <form action={generatorAction} className="mt-3 space-y-2">
                     <input type="hidden" name="profileId" value={profile.id} />
                     <input type="hidden" name="programId" value={activeProgram.id} />
+                    <input type="hidden" name="sessionsPerWeek" value={activeProgram.sessionsPerWeek} />
                     <label className="block text-[10px] font-bold text-white/45">
                       Tydzień rozpoczynający się
                       <input className={`${fieldClass} mt-1`} name="weekStart" type="date" value={weekStart} onChange={(event) => { if (event.target.value) setWeekStart(startOfWeekISO(event.target.value)); }} required />
                     </label>
-                    <select className={fieldClass} name="focus" defaultValue="balanced" aria-label="Kierunek automatycznego planu">
+                    <select
+                      className={fieldClass}
+                      name="focus"
+                      value={planFocus}
+                      onChange={(event) => setPlanFocus(event.target.value as PlanFocus)}
+                      aria-label="Kierunek automatycznego planu"
+                    >
                       <option value="balanced">Plan zbalansowany</option>
                       <option value="cycling">Priorytet rowerowy</option>
                       <option value="outdoor">Więcej aktywności outdoor</option>
                       <option value="recovery">Lekki tydzień regeneracyjny</option>
                     </select>
+                    {weekHasSessions ? (
+                      <p className="text-xs text-white/70">Ten tydzień ma już treningi. Wybierz inny tydzień.</p>
+                    ) : (
+                      <div className="rounded-xl bg-black/15 p-3">
+                        <h3 className="text-xs font-black">Podgląd planu</h3>
+                        <ul className="mt-2 divide-y divide-white/10">
+                          {proposedSessions.map((session) => (
+                            <li key={`${session.scheduledFor}-${session.title}`} className="py-2 text-xs">
+                              <time dateTime={session.scheduledFor} className="text-orange-200">
+                                {dayFormatter.format(dateFromISO(session.scheduledFor))}
+                              </time>
+                              <p className="mt-1 font-bold">{session.title}</p>
+                              <p className="text-white/65">
+                                {session.durationMinutes} min · {intensityLabels[session.intensity]} · {session.environment === "outdoor" ? "na zewnątrz" : "wewnątrz"}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     <ActionMessage state={generatorState} />
-                    <button disabled={generatorPending} className="w-full rounded-xl bg-orange-400 px-4 py-3 text-sm font-black text-[#102019] disabled:opacity-50">
-                      {generatorPending ? "Układanie planu…" : "Wygeneruj ten tydzień"}
+                    <button disabled={generatorPending || weekHasSessions} className="w-full rounded-xl bg-orange-400 px-4 py-3 text-sm font-black text-[#102019] disabled:opacity-50">
+                      {generatorPending ? "Zapisywanie…" : "Zapisz proponowany plan"}
                     </button>
                   </form>
                 </div>
@@ -711,7 +744,7 @@ export function CloudDashboard({ data, householdId, today }: CloudDashboardProps
               )}
             </div>
 
-            {sessions.length > 0 && !sessions.some((session) => weekDates.includes(session.scheduledFor)) ? (
+            {sessions.length > 0 && !weekHasSessions ? (
               <div className="mt-4 rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center">
                 <CalendarDays aria-hidden="true" className="mx-auto size-6 text-white/20" />
                 <p className="mt-2 text-sm font-bold text-white/50">Brak treningów w tym tygodniu</p>
