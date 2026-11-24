@@ -2,6 +2,8 @@
 
 import { ArrowRight, Cloud, ShieldCheck, UsersRound } from "lucide-react";
 import { useActionState } from "react";
+import { JoinFamily } from "./family-invitation";
+import { InstallMenu } from "@/components/pwa/install-menu";
 
 import {
   createFamilyWorkspace,
@@ -93,6 +95,8 @@ export function WorkspaceSetup({ defaultOwnerName }: WorkspaceSetupProps) {
           </button>
         </form>
 
+        <JoinFamily />
+        <InstallMenu />
         <p className="mt-6 flex items-start gap-2 text-xs leading-5 text-white/40">
           <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-emerald-300/70" />
           Tylko zalogowani członkowie tej przestrzeni otrzymają dostęp do

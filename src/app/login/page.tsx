@@ -2,6 +2,7 @@ import { Bike, Cloud, ShieldCheck, Smartphone } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/components/auth/login-form";
+import { InstallMenu } from "@/components/pwa/install-menu";
 import { hasSupabaseEnvironment } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
@@ -39,6 +40,7 @@ export default async function LoginPage() {
           </p>
         )}
 
+        <InstallMenu />
         <div className="mt-8 grid grid-cols-3 gap-2 border-t border-white/8 pt-6 text-center text-[10px] font-bold text-white/35">
           <span className="grid gap-2"><Cloud aria-hidden="true" className="mx-auto size-4" />Synchronizacja</span>
           <span className="grid gap-2"><Smartphone aria-hidden="true" className="mx-auto size-4" />Telefony</span>

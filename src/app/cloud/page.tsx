@@ -44,7 +44,7 @@ export default async function CloudAppPage() {
       .single(),
     supabase
       .from("profiles")
-      .select("id, name, initials, focus, theme")
+      .select("id, name, initials, focus, theme, auth_user_id")
       .eq("household_id", membership.household_id)
       .order("created_at", { ascending: true }),
   ]);
@@ -131,6 +131,13 @@ export default async function CloudAppPage() {
   return (
     <CloudDashboard
       householdId={membership.household_id}
+      initialProfileId={(profilesResult.data ?? [])
+        .find((profile) => profile.auth_user_id === userId)?.id}
+      inviteProfiles={membership.role === "owner"
+        ? (profilesResult.data ?? [])
+            .filter((profile) => profile.auth_user_id === null)
+            .map(({ id, name }) => ({ id, name }))
+        : null}
       today={new Date().toISOString().slice(0, 10)}
       data={{
         householdName: householdResult.data.name,

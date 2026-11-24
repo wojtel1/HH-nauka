@@ -45,11 +45,15 @@ import { generateWeeklyTrainingPlan, type PlanFocus } from "@/lib/training-plan"
 import { buildWeeklyTrainingReport } from "@/lib/training-report";
 
 import { TrainingTrends } from "./training-trends";
+import { FamilyInvitation } from "./family-invitation";
+import { InstallMenu } from "@/components/pwa/install-menu";
 import type { CloudDashboardData, CloudSession } from "./types";
 
 interface CloudDashboardProps {
   data: CloudDashboardData;
   householdId: string;
+  initialProfileId?: string;
+  inviteProfiles: { id: string; name: string }[] | null;
   today: string;
 }
 
@@ -299,8 +303,8 @@ function SessionCard({ session }: { session: CloudSession }) {
   );
 }
 
-export function CloudDashboard({ data, householdId, today }: CloudDashboardProps) {
-  const [selectedProfileId, setSelectedProfileId] = useState(data.profiles[0]?.id ?? "");
+export function CloudDashboard({ data, householdId, initialProfileId, inviteProfiles, today }: CloudDashboardProps) {
+  const [selectedProfileId, setSelectedProfileId] = useState(initialProfileId ?? data.profiles[0]?.id ?? "");
   const [weekStart, setWeekStart] = useState(startOfWeekISO(today));
   const [planFocus, setPlanFocus] = useState<PlanFocus>("balanced");
   const [profileState, profileAction, profilePending] = useActionState(
@@ -378,6 +382,7 @@ export function CloudDashboard({ data, householdId, today }: CloudDashboardProps
       </header>
 
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+        <InstallMenu />
         <section className="rounded-[1.75rem] border border-white/10 bg-[#10251d]/85 p-4 shadow-2xl shadow-black/20 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -754,6 +759,7 @@ export function CloudDashboard({ data, householdId, today }: CloudDashboardProps
           </section>
         </div>
 
+        {inviteProfiles !== null ? <FamilyInvitation profiles={inviteProfiles} /> : null}
         <p className="mt-5 flex items-center justify-center gap-2 text-center text-[11px] text-white/30">
           <ShieldCheck aria-hidden="true" className="size-4 text-emerald-300/60" /> Dane zapisują się w prywatnej przestrzeni Supabase.
         </p>

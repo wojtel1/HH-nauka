@@ -83,6 +83,46 @@ async function authenticatedClient() {
   return { supabase, userId: data.claims.sub };
 }
 
+export async function createFamilyInvitation(
+  _previousState: CloudActionState,
+  formData: FormData,
+): Promise<CloudActionState> {
+  const input = z.object({
+    profileId: z.uuid(),
+    email: z.string().trim().max(254).pipe(z.email()),
+  }).safeParse({ profileId: formData.get("profileId"), email: formData.get("email") });
+  if (!input.success) return { status: "error", message: "Wybierz profil i podaj poprawny e-mail." };
+
+  const { supabase } = await authenticatedClient();
+  const { data, error } = await supabase.rpc("create_family_invitation", {
+    target_profile: input.data.profileId,
+    invited_email: input.data.email,
+  });
+  if (error || typeof data !== "string") {
+    return { status: "error", message: "Nie udało się utworzyć kodu dla tego profilu." };
+  }
+
+  return { status: "success", message: data };
+}
+
+export async function acceptFamilyInvitation(
+  _previousState: CloudActionState,
+  formData: FormData,
+): Promise<CloudActionState> {
+  const code = z.string().trim().pipe(z.uuid()).safeParse(formData.get("code"));
+  if (!code.success) return { status: "error", message: "Wklej pełny kod zaproszenia." };
+
+  const { supabase } = await authenticatedClient();
+  const { data, error } = await supabase.rpc("accept_family_invitation", { invite_code: code.data });
+  if (error) return { status: "error", message: "Nie udało się teraz sprawdzić zaproszenia." };
+  if (data !== true) {
+    return { status: "error", message: "Kod jest nieaktywny, przypisany do innego e-maila lub konto należy już do rodziny." };
+  }
+
+  revalidatePath("/cloud");
+  redirect("/cloud");
+}
+
 async function profileIsAccessible(
   supabase: Awaited<ReturnType<typeof createClient>>,
   profileId: string,
