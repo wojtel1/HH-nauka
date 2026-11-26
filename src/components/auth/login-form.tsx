@@ -7,6 +7,14 @@ import { createClient } from "@/lib/supabase/client";
 
 type SubmissionState = "idle" | "sending" | "sent" | "error";
 
+function sendErrorMessage(code?: string, status?: number) {
+  if (code === "email_address_not_authorized") {
+    return "Wysyłka linków na ten adres jest jeszcze niedostępna. Skontaktuj się z administratorem Endurance.";
+  }
+  if (status === 429) return "Odczekaj chwilę przed wysłaniem kolejnej wiadomości.";
+  return "Nie udało się wysłać linku. Sprawdź adres i spróbuj ponownie.";
+}
+
 export function LoginForm() {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<SubmissionState>("idle");
@@ -17,25 +25,27 @@ export function LoginForm() {
     setState("sending");
     setMessage("");
 
-    const supabase = createClient();
-    const redirectTo = `${window.location.origin}/auth/confirm?next=/cloud`;
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: redirectTo },
-    });
+    try {
+      const supabase = createClient();
+      const redirectTo = `${window.location.origin}/auth/confirm`;
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: { emailRedirectTo: redirectTo },
+      });
 
-    if (error) {
+      if (error) {
+        setState("error");
+        setMessage(sendErrorMessage(error.code, error.status));
+        return;
+      }
+    } catch {
       setState("error");
-      setMessage(
-        error.status === 429
-          ? "Odczekaj chwilę przed wysłaniem kolejnej wiadomości."
-          : "Nie udało się wysłać linku. Sprawdź adres i spróbuj ponownie.",
-      );
+      setMessage("Nie udało się połączyć z usługą logowania. Spróbuj ponownie.");
       return;
     }
 
     setState("sent");
-    setMessage("Link logowania został wysłany. Sprawdź skrzynkę e-mail.");
+    setMessage("Sprawdź skrzynkę e-mail i spam. Otwórz najnowszy link na tym samym urządzeniu.");
   };
 
   return (

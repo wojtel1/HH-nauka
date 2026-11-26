@@ -9,7 +9,11 @@ import { createClient } from "@/lib/supabase/server";
 // The login route checks the request session before rendering.
 export const instant = false;
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string | string[] }>;
+}) {
   const cloudConfigured = hasSupabaseEnvironment();
 
   if (cloudConfigured) {
@@ -17,6 +21,7 @@ export default async function LoginPage() {
     const { data } = await supabase.auth.getClaims();
     if (data?.claims) redirect("/cloud");
   }
+  const invalidLink = (await searchParams).error === "invalid_link";
 
   return (
     <main className="min-h-dvh bg-[#07130f] px-4 py-8 text-white sm:grid sm:place-items-center sm:p-8">
@@ -31,6 +36,12 @@ export default async function LoginPage() {
         <p className="mt-3 text-sm leading-6 text-white/50">
           Wyślemy jednorazowy link. Nie musisz tworzyć ani zapamiętywać hasła.
         </p>
+
+        {invalidLink ? (
+          <p role="alert" className="mt-6 rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">
+            Nie udało się potwierdzić logowania. Zamów nowy link i otwórz go na urządzeniu, z którego go wysłano.
+          </p>
+        ) : null}
 
         {cloudConfigured ? (
           <LoginForm />

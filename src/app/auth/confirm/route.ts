@@ -17,20 +17,22 @@ export async function GET(request: NextRequest) {
   const code = url.searchParams.get("code");
   const tokenHash = url.searchParams.get("token_hash");
   const rawType = url.searchParams.get("type");
-  const next = url.searchParams.get("next");
-  const destination = next?.startsWith("/") && !next.startsWith("//") ? next : "/cloud";
+  const destination = new URL("/cloud", url.origin);
+  const invalidLink = new URL("/login?error=invalid_link", url.origin);
+  if (!code && !tokenHash) return NextResponse.redirect(invalidLink);
+
   const supabase = await createClient();
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(new URL(destination, url.origin));
+    if (!error) return NextResponse.redirect(destination);
   } else if (tokenHash && rawType && emailOtpTypes.has(rawType as EmailOtpType)) {
     const { error } = await supabase.auth.verifyOtp({
       token_hash: tokenHash,
       type: rawType as EmailOtpType,
     });
-    if (!error) return NextResponse.redirect(new URL(destination, url.origin));
+    if (!error) return NextResponse.redirect(destination);
   }
 
-  return NextResponse.redirect(new URL("/login?error=invalid_link", url.origin));
+  return NextResponse.redirect(invalidLink);
 }
